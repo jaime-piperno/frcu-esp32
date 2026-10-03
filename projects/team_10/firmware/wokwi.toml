@@ -1,0 +1,6 @@
+# Configuración de la simulación Wokwi local (extensión VS Code).
+# El firmware se compila con arduino-cli a build/ (ver README del firmware).
+[wokwi]
+version = 1
+firmware = 'build/RecuerdaMed.ino.elf'
+elf = 'build/RecuerdaMed.ino.elf'

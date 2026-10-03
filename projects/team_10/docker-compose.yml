@@ -1,0 +1,63 @@
+name: recuerdamed
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: recuerdamed-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-recuerdamed}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-recuerdamed_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-recuerdamed}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-recuerdamed} -d ${POSTGRES_DB:-recuerdamed}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: recuerdamed-mqtt
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+      - "${MQTT_WS_PORT:-9001}:9001"
+    volumes:
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/version' -C 1 -W 3 >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: recuerdamed-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-recuerdamed};Username=${POSTGRES_USER:-recuerdamed};Password=${POSTGRES_PASSWORD:-recuerdamed_dev_password}"
+      # Para probar el firmware desde Wokwi: MQTT_BROKER_HOST=test.mosquitto.org
+      # (default: broker local del compose).
+      Mqtt__Broker: ${MQTT_BROKER_HOST:-mqtt}
+      Mqtt__Port: ${MQTT_BROKER_PORT:-1883}
+      Mqtt__ClientId: recuerdamed-backend
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+volumes:
+  db_data:
+  mqtt_data:
+  mqtt_log:
