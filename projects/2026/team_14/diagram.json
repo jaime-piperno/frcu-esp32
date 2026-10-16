@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "author": "Semaforo de Ruido - ESP32",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd",
+      "top": -330,
+      "left": -190,
+      "attrs": { "pins": "i2c", "address": "0x27" }
+    },
+    { "type": "wokwi-microphone", "id": "mic", "top": -141.78, "left": -360.21, "attrs": {} },
+    {
+      "type": "wokwi-rgb-led",
+      "id": "rgb",
+      "top": 230,
+      "left": -440,
+      "attrs": { "common": "cathode" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 200,
+      "left": -230,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 250,
+      "left": -230,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r3",
+      "top": 300,
+      "left": -230,
+      "attrs": { "value": "220" }
+    },
+    { "type": "wokwi-ky-040", "id": "enc", "top": -140, "left": 330, "attrs": {} },
+    { "type": "wokwi-buzzer", "id": "bz", "top": 220, "left": 340, "attrs": { "volume": "0.1" } },
+    {
+      "type": "wokwi-text",
+      "id": "tTit",
+      "top": -420,
+      "left": -430,
+      "attrs": { "text": "SEMAFORO DE RUIDO - ESP32 DevKit V1 + KY-037", "fontSize": "20" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "tLcd",
+      "top": -370,
+      "left": -190,
+      "attrs": { "text": "LCD 1602 I2C   VCC=VIN (5 V)   SDA=D32   SCL=D33", "fontSize": "13" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "tMic",
+      "top": -67.2,
+      "left": -624,
+      "attrs": { "text": "KY-037   VCC=3V3 (nunca 5 V)   A0=D34   D0 sin conectar", "fontSize": "13" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "tMic2",
+      "top": -38.4,
+      "left": -758.4,
+      "attrs": {
+        "text": "(la capsula de Wokwi solo tiene 2 pines; el modulo real suma VCC a 3V3)",
+        "fontSize": "11"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "tRgb",
+      "top": 201.6,
+      "left": -633.6,
+      "attrs": { "text": "LED RGB catodo comun   R=D26  G=D25  B=D27   220 ohm", "fontSize": "13" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "tEnc",
+      "top": -163.2,
+      "left": 182.4,
+      "attrs": { "text": "Encoder rotativo   VCC=3V3   CLK=D18  DT=D19  SW=D21", "fontSize": "13" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "tBz",
+      "top": 316.8,
+      "left": 259.2,
+      "attrs": { "text": "Buzzer pasivo   senal=D23", "fontSize": "13" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "tNota",
+      "top": 374.4,
+      "left": -528,
+      "attrs": {
+        "text": "Nota: el LCD se alimenta de VIN (5 V); sus resistencias pull-up dejan SDA y SCL en 5 V,",
+        "fontSize": "12"
+      }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "tNota2",
+      "top": 403.2,
+      "left": -528,
+      "attrs": {
+        "text": "por lo que corresponde intercalar un conversor de nivel a 3,3 V.",
+        "fontSize": "12"
+      }
+    }
+  ],
+  "connections": [
+    [ "mic:1", "esp:GND.2", "black", [ "v20", "h326.4", "v222.72" ] ],
+    [ "mic:2", "esp:D34", "green", [ "v-20", "h60" ] ],
+    [ "lcd:VCC", "esp:VIN", "red", [ "h-34.8", "v451.7", "v-6.88" ] ],
+    [ "lcd:GND", "esp:GND.1", "black", [ "v-50", "h360", "v560" ] ],
+    [ "lcd:SDA", "esp:D32", "cyan", [ "h-15.6", "v60", "v288.92" ] ],
+    [ "lcd:SCL", "esp:D33", "cyan", [ "h-25.2", "v80", "v269.02" ] ],
+    [ "esp:D26", "r1:1", "red", [ "h-40", "v0" ] ],
+    [ "r1:2", "rgb:R", "red", [ "h-40", "v0" ] ],
+    [ "esp:D25", "r2:1", "green", [ "h-60", "v0" ] ],
+    [ "r2:2", "rgb:G", "green", [ "h-40", "v0" ] ],
+    [ "esp:D27", "r3:1", "blue", [ "h-80", "v0" ] ],
+    [ "r3:2", "rgb:B", "blue", [ "h-40", "v0" ] ],
+    [ "rgb:COM", "esp:GND.2", "black", [ "v80", "h200" ] ],
+    [ "enc:VCC", "esp:3V3", "red", [ "h5.2", "v65.3", "v194.72" ] ],
+    [ "enc:GND", "esp:GND.2", "black", [ "v46.5", "h-465.2", "v194.72" ] ],
+    [ "enc:CLK", "esp:D18", "yellow", [ "h43.6", "v132.1", "v79.52" ] ],
+    [ "enc:DT", "esp:D19", "yellow", [ "h24.4", "v110", "v82.52" ] ],
+    [ "enc:SW", "esp:D21", "orange", [ "h14.8", "v173.32" ] ],
+    [ "bz:1", "esp:GND.2", "black", [ "h-50.2", "v-40", "h-312" ] ],
+    [ "bz:2", "esp:D23", "purple", [ "h35.8", "v-284.8", "h-311.51" ] ]
+  ],
+  "dependencies": {}
+}
