@@ -1,0 +1,135 @@
+# 📌 UTN FRCU – Tecnologías para la Automatización ESP32 2026
+
+## 👥 Team
+
+**Team number:** [Ingresar número de grupo]  
+
+**Members:**
+* Ortiz, Facundo
+* Carrasco, Fabiana
+* Gomez, Thiago Kehler
+* Torres, Sofía
+* Pighetti, Luciano
+
+---
+
+## 🤖 Project Description
+
+**Description:**  
+Sistema embebido de control y traducción en tiempo real de Código Morse a texto en lenguaje natural. Utiliza un algoritmo de medición de pulso adaptativo donde la primera pulsación del usuario establece dinámicamente la velocidad base de transmisión (duración del punto). Incluye filtrado antirebote por software (*debounce*), traducción automática por tabla de búsqueda (*lookup table*), acumulación de texto, inserción automática de espacios entre palabras y cierre de mensaje final por inactividad tras 5 segundos.
+
+**Technology used:**  
+ESP32 (C++/Arduino Framework), Arduino IDE, Wokwi Simulator, C standard libraries.
+
+---
+
+## 🔩 Components Used
+
+| Component | Quantity | Notes |
+| :--- | :---: | :--- |
+| ESP32 DevKit v1 | 1 | Procesador principal a 240 MHz (GPIO 2, 4, 18) |
+| Módulo Pulsador (3 pines) | 1 | Sensor de entrada digital con resistencia de adaptación integrada |
+| Diodo LED Red | 1 | Actuador visual para retroalimentación instantánea de pulsación |
+| Resistencia 220Ω | 1 | Limitadora de corriente para el LED |
+| Buzzer Piezoeléctrico Pasivo | 1 | Actuador sonoro (emisión de tono PWM a 1000 Hz) |
+| Protoboard / Jumper wires | 1 / c/n | Interconexión de componentes y distribución de alimentación |
+| Power supply | 1 | Alimentación USB a 5V (3.3V lógica interna) |
+
+---
+
+## 🛠️ Usage Instructions
+
+* **Step 1: Environment Setup:**  
+  Install the ESP32 board support package in Arduino IDE or VS Code + PlatformIO. Select `ESP32 Dev Module` or `ESP32 DevKit V1`.
+
+* **Step 2: Wiring / Circuit Setup:**  
+  * Connect Pushbutton module: `Signal` to **GPIO 4**, `VCC` to **3V3**, `GND` to **GND**.  
+  * Connect LED: Anode to Resistor (220Ω) to **GPIO 2**, Cathode to **GND**.  
+  * Connect Passive Buzzer: Positive (+) to **GPIO 18**, Negative (-) to **GND**.
+
+* **Step 3: Upload and Run:**  
+  Compile and upload `sketch.ino` / `main.cpp` via USB at 115200 baud. Open the Serial Monitor at 115200 baud.
+
+* **Step 4: Expected Output:**  
+  1. The Serial Monitor will prompt for the initial calibration pulse.  
+  2. Perform your first button press to calibrate the timing base.  
+  3. Pulse dots (`.`) and dashes (`-`) in Morse code; real-time audio (buzzer) and visual (LED) feedback will trigger.  
+  4. After short pauses, translated characters will accumulate into a string.  
+  5. After 5 seconds of total inactivity, the final processed string will be printed in the console and the system will reset for a new message.
+
+---
+
+## 🧪 Simulation
+
+* **Wokwi project link:** [Ingresar link del proyecto en Wokwi si lo subieron a la nube]
+* **Diagram/export files:** `diagram.json`, `sketch.ino` (incluidos en el repositorio).
+
+---
+
+## 📝 Additional Notes
+
+* **Challenges faced / technical decisions made:**  
+  * Implementation of a 50 ms software debounce filter to eliminate mechanical contact bounces and prevent false double-point triggers.  
+  * Selection of non-blocking timing logic using `millis()` instead of `delay()` to maintain responsiveness for sensor inputs and timeout checks simultaneously.  
+  * Adaptive timing threshold calculation to adjust dot/dash discrimination and letter/word timeouts proportional to the user's initial typing speed.
+
+* **Current limitations of the project:**  
+  * Requires a clear initial pulse without noise to calibrate speed correctly.  
+  * Character lookup table currently covers alphanumeric standard Morse (A-Z, 0-9) without special accent marks or punctuation symbols.
+
+* **Potential improvements for the future:**  
+  * Add a physical reset button or dynamic recalibration gesture for speed adjustments mid-sentence.  
+  * Include an I2C LCD screen (16x2 / 20x4) or OLED display to view output offline without relying on Serial Monitor (HMI).  
+  * Web interface generation using ESP32 Wi-Fi capabilities to display translated text on a local network dashboard.
+
+---
+
+## 🔄 Stage 2 – Improvement
+
+**Team number:** [Ingresar número de grupo]  
+
+**Members:**
+* Ortiz, Facundo
+* Carrasco, Fabiana
+* Gomez, Thiago Kehler
+* Torres, Sofía
+* Pighetti, Luciano
+
+---
+
+## 🚀 Improvement Description
+
+* **What was improved:**  
+  Implementation of software debounce filter (50 ms threshold and 60 ms minimum pulse validation) alongside real-time string accumulation and automatic inactivity timeout closure (5 seconds).
+
+* **Why:**  
+  Stage 1 baseline presented mechanical switch bouncing issues causing double-dot inputs, lacked string concatenation for complete words, and required manual reset triggers.
+
+---
+
+## 🔩 Component Changes
+
+* **Change:** `No hardware changes` (Only firmware/logic enhancements were applied over Stage 1 hardware architecture).
+
+---
+
+## 🛠️ Updated Usage Instructions
+
+* **No structural changes from Stage 1 wiring.** Refer to Stage 1 pinout mapping (`GPIO 4` for Button, `GPIO 2` for LED, `GPIO 18` for Buzzer).
+
+---
+
+## 🧪 Updated Simulation
+
+* **Wokwi project link:** [Ingresar link o indicar "Same as Stage 1"]
+* **Diagram/export files:** `diagram.json`, `sketch.ino`
+
+---
+
+## 📝 Additional Notes
+
+* **Challenges faced / technical decisions made:**  
+  Fine-tuning debounce thresholds (`TIEMPO_DEBOUNCE = 50ms` and `duracionPulsacion >= 60ms`) to strike the perfect balance between filtering mechanical noise and registering fast Morse dots.
+
+* **Remaining limitations:**  
+  Extremely erratic typing rhythms might require recalibration by letting the 5-second timeout complete.
