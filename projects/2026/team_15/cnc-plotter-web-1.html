@@ -1,0 +1,2860 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>CNC Plotter — Web Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Vazirmatn:wght@400;500;600;700;800&family=Caveat:wght@400;500;600;700&family=Dancing+Script:wght@400;500;600;700&family=Shadows+Into+Light&family=Homemade+Apple&family=Permanent+Marker&family=Reenie+Beanie&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0e1a;
+    --panel:#161829;
+    --panel-2:#1e2138;
+    --border:#2b2f4d;
+    --blue:#4a90d9;
+    --blue-soft:rgba(74,144,217,0.15);
+    --teal:#00d4aa;
+    --teal-soft:rgba(0,212,170,0.15);
+    --coral:#ff6b6b;
+    --coral-soft:rgba(255,107,107,0.15);
+    --amber:#f2c14e;
+    --amber-soft:rgba(242,193,78,0.15);
+    --text:#e9eaf5;
+    --muted:#8a8db3;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --sans:'Vazirmatn','Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);height:100%;}
+  body{
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(74,144,217,0.08), transparent 45%),
+      radial-gradient(circle at 100% 100%, rgba(0,212,170,0.06), transparent 40%);
+    min-height:100vh;
+  }
+  ::selection{background:var(--blue-soft);}
+  button{font-family:inherit;cursor:pointer;}
+  input,button{font-size:14px;}
+
+  /* ---------- Top HUD ---------- */
+  .hud{
+    display:flex;align-items:center;gap:14px;
+    padding:12px 18px;background:rgba(22,24,41,0.85);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;
+    flex-wrap:wrap;
+  }
+  .hud .brand{display:flex;align-items:center;gap:10px;margin-inline-end:auto;}
+  .hud .brand .dot-logo{width:11px;height:11px;border-radius:3px;background:var(--blue);box-shadow:0 0 12px var(--blue);flex:none;}
+  .hud .brand b{font-size:15px;letter-spacing:.3px;}
+  .hud .brand span{font-size:11px;color:var(--muted);display:block;font-family:var(--mono);}
+
+  .conn-pill{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);font-size:12px;font-family:var(--mono);}
+  .conn-pill .led{width:8px;height:8px;border-radius:50%;background:var(--coral);box-shadow:0 0 6px var(--coral);}
+  .conn-pill.on .led{background:var(--teal);box-shadow:0 0 8px var(--teal);animation:pulse 1.8s infinite;}
+  .conn-pill.busy .led{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse .8s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  .pos-readout{display:flex;gap:10px;font-family:var(--mono);font-size:12px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:6px 12px;}
+  .pos-readout div span.axis{color:var(--muted);margin-inline-end:4px;}
+  .pos-readout div span.val{color:var(--text);font-weight:600;}
+  .pos-readout div.x span.val{color:var(--blue);}
+  .pos-readout div.y span.val{color:var(--teal);}
+  .pos-readout div.z span.val{color:var(--amber);}
+
+  /* ---------- Layout ---------- */
+  .app{display:flex;min-height:calc(100vh - 58px);}
+  nav.tabs{
+    display:flex;flex-direction:column;gap:4px;padding:16px 10px;width:190px;flex:none;
+    border-inline-end:1px solid var(--border);background:rgba(255,255,255,0.01);
+  }
+  nav.tabs button{
+    display:flex;align-items:center;gap:10px;background:transparent;border:1px solid transparent;color:var(--muted);
+    padding:10px 12px;border-radius:10px;text-align:right;font-weight:600;font-size:13px;transition:.15s;
+  }
+  nav.tabs button:hover{background:var(--panel-2);color:var(--text);}
+  nav.tabs button.active{background:var(--blue-soft);border-color:rgba(74,144,217,0.4);color:var(--blue);}
+  nav.tabs button .ic{width:16px;text-align:center;flex:none;}
+
+  main{flex:1;padding:22px;max-width:1100px;}
+  .screen{display:none;animation:fade .25s ease;}
+  .screen.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  h1.page-title{font-size:18px;margin:0 0 4px;}
+  p.page-sub{color:var(--muted);font-size:12.5px;margin:0 0 20px;}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+  .card h2{font-size:13px;margin:0 0 14px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  @media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+  input[type=text],input[type=number],select,textarea{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:10px 12px;border-radius:9px;font-family:var(--mono);outline:none;transition:.15s;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft);}
+  textarea{font-family:var(--mono);resize:vertical;min-height:120px;}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:10px 16px;border-radius:9px;font-weight:600;transition:.15s;
+  }
+  .btn:hover{border-color:var(--blue);transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#08101c;}
+  .btn.primary:hover{background:#5a9de3;}
+  .btn.success{background:var(--teal);border-color:var(--teal);color:#052a22;}
+  .btn.danger{background:transparent;border-color:var(--coral);color:var(--coral);}
+  .btn.danger:hover{background:var(--coral-soft);}
+  .btn.block{width:100%;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;}
+
+  /* Jog pad */
+  .jogpad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(3,64px);gap:8px;justify-content:center;margin:10px auto;}
+  .jogpad button{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;transition:.12s;}
+  .jogpad button:hover{border-color:var(--blue);background:var(--blue-soft);}
+  .jogpad button:active{transform:scale(.92);background:var(--blue);color:#08101c;}
+  .jogpad .home{color:var(--amber);font-size:14px;}
+  .z-pad{display:flex;flex-direction:column;gap:8px;align-items:center;}
+  .z-pad button{width:64px;height:64px;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;color:var(--amber);font-size:18px;}
+  .z-pad button:hover{border-color:var(--amber);background:var(--amber-soft);}
+  .jog-cluster{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;padding:8px 0 4px;}
+  .step-select{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
+  .step-select button{padding:6px 14px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:12px;}
+  .step-select button.active{background:var(--blue);border-color:var(--blue);color:#08101c;font-weight:700;}
+
+  /* Canvas plotter bed */
+  .bed-wrap{position:relative;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#0a0b14;}
+  canvas{display:block;width:100%;height:340px;}
+  .bed-info{position:absolute;top:10px;inset-inline-start:12px;font-family:var(--mono);font-size:11px;color:var(--muted);background:rgba(13,14,26,0.7);padding:4px 9px;border-radius:6px;}
+
+  .log{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:#0a0b14;border:1px solid var(--border);border-radius:10px;padding:10px 12px;height:110px;overflow-y:auto;line-height:1.7;}
+  .log b{color:var(--text);}
+  .log .err{color:var(--coral);}
+  .log .ok{color:var(--teal);}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-2);border:1px solid var(--coral);color:var(--text);padding:10px 18px;border-radius:10px;font-size:13px;z-index:100;display:none;box-shadow:0 8px 30px rgba(0,0,0,0.4);}
+  .toast.show{display:block;animation:fade .2s ease;}
+
+  .file-drop{border:2px dashed var(--border);border-radius:12px;padding:22px;text-align:center;color:var(--muted);font-size:13px;transition:.15s;cursor:pointer;}
+  .file-drop:hover,.file-drop.drag{border-color:var(--blue);background:var(--blue-soft);color:var(--text);}
+
+  .range-row{display:flex;align-items:center;gap:10px;}
+  input[type=range]{flex:1;accent-color:var(--blue);}
+  .range-val{font-family:var(--mono);font-size:12px;color:var(--text);min-width:52px;text-align:left;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:2px 6px;}
+  .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:640px){.compare-grid{grid-template-columns:1fr;}}
+  .img-canvas-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#0a0b14;position:relative;}
+  .img-canvas-wrap canvas{display:block;width:100%;height:240px;}
+  .img-canvas-wrap .cap{position:absolute;top:8px;inset-inline-start:10px;font-size:10.5px;color:var(--muted);background:rgba(13,14,26,0.7);padding:2px 8px;border-radius:6px;font-family:var(--mono);}
+  .stat-chip{display:inline-flex;gap:6px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-inline-end:8px;margin-top:6px;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-top:12px;}
+  .checkbox-row input{width:16px;height:16px;accent-color:var(--blue);}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.6;}
+  .hint.warn{color:var(--amber);}
+  .kbd{font-family:var(--mono);background:var(--panel-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:11px;}
+
+  @media(max-width:760px){
+    .app{flex-direction:column;}
+    nav.tabs{flex-direction:row;width:100%;overflow-x:auto;border-inline-end:none;border-bottom:1px solid var(--border);padding:8px;}
+    nav.tabs button{flex:none;}
+    main{padding:14px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="hud">
+  <div class="brand">
+    <div class="dot-logo"></div>
+    <div><b>CNC Plotter</b><span>Web Control — WebSocket</span></div>
+  </div>
+  <div class="pos-readout">
+    <div class="x"><span class="axis">X</span><span class="val" id="hudX">0.00</span></div>
+    <div class="y"><span class="axis">Y</span><span class="val" id="hudY">0.00</span></div>
+    <div class="z"><span class="axis">Z</span><span class="val" id="hudZ">0.00</span></div>
+  </div>
+  <div class="conn-pill" id="connPill"><div class="led"></div><span id="connLabel">Disconnected</span></div>
+</div>
+
+<div class="app">
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="connect"><span class="ic">🔌</span> Connect</button>
+    <button class="tab-btn" data-tab="control"><span class="ic">🎮</span> Control</button>
+    <button class="tab-btn" data-tab="gcode"><span class="ic">📄</span> G-Code</button>
+    <button class="tab-btn" data-tab="image"><span class="ic">🖼️</span> Image → G-Code</button>
+    <button class="tab-btn" data-tab="handwrite"><span class="ic">✍️</span> Handwriting</button>
+    <button class="tab-btn" data-tab="paint"><span class="ic">🖌️</span> Paint</button>
+    <button class="tab-btn" data-tab="calib"><span class="ic">📐</span> Calibration</button>
+    <button class="tab-btn" data-tab="settings"><span class="ic">⚙️</span> Settings</button>
+  </nav>
+
+  <main>
+
+    <!-- CONNECT SCREEN -->
+    <section class="screen active" id="screen-connect">
+      <h1 class="page-title">Connect to Device</h1>
+      <p class="page-sub">The browser can't connect to WiFi on your behalf — first connect your phone/laptop to the ESP32's network (or a shared network) via your device's WiFi settings, then enter the device IP here.</p>
+
+      <div class="card">
+        <h2>Device Address</h2>
+        <div class="grid2">
+          <div>
+            <label>ESP Device IP</label>
+            <input type="text" id="espIp" placeholder="192.168.4.1" value="192.168.4.1">
+          </div>
+          <div>
+            <label>WebSocket Port</label>
+            <input type="number" id="espPort" placeholder="81" value="81">
+          </div>
+        </div>
+        <div class="hint" id="wsUrlPreview">Connection address: ws://192.168.4.1:81/</div>
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn primary" id="btnConnect">Connect</button>
+          <button class="btn danger" id="btnDisconnect" disabled>Disconnect</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Guide</h2>
+        <div class="hint">1. If the ESP32 creates its own Access Point, connect your phone/laptop to that network (e.g. ESP-CNC). The default address is usually <span class="kbd">192.168.4.1</span>.</div>
+        <div class="hint">2. If the ESP32 is connected to your home/office router, find its IP address in the router settings or via the Arduino Serial Monitor.</div>
+        <div class="hint">3. Enter the WebSocket port to match the code uploaded to the ESP32 (in most AsyncWebSocket projects, port 81 or 80 is common).</div>
+        <div class="hint warn">4. If this site is opened over HTTPS, the browser will usually block an insecure ws:// connection. Open this page from a local server or an HTML file, not from an HTTPS domain.</div>
+      </div>
+
+      <div class="card">
+        <h2>Connection Log</h2>
+        <div class="log" id="connLog"></div>
+      </div>
+    </section>
+
+    <!-- CONTROL SCREEN -->
+    <section class="screen" id="screen-control">
+      <h1 class="page-title">Manual Control</h1>
+      <p class="page-sub">Jog the axes and view the device's real-time status.</p>
+
+      <div class="grid2">
+        <div class="card">
+          <h2>X / Y Axis</h2>
+          <div class="jog-cluster">
+            <div class="jogpad">
+              <div></div>
+              <button data-jog="Y+">▲</button>
+              <div></div>
+              <button data-jog="X-">◀</button>
+              <button class="home" data-action="home">⌂</button>
+              <button data-jog="X+">▶</button>
+              <div></div>
+              <button data-jog="Y-">▼</button>
+              <div></div>
+            </div>
+            <div class="z-pad">
+              <button data-jog="Z+">Z+</button>
+              <button data-jog="Z-">Z-</button>
+            </div>
+          </div>
+          <div class="step-select" id="stepSelect">
+            <button data-step="0.1">0.1mm</button>
+            <button data-step="1" class="active">1mm</button>
+            <button data-step="5">5mm</button>
+            <button data-step="10">10mm</button>
+          </div>
+          <div class="btn-row" style="margin-top:14px;justify-content:center;">
+            <button class="btn" id="btnSetZero">📍 This Point = Zero (0,0,0)</button>
+          </div>
+          <div class="hint">Jog the pen to wherever you want the drawing origin to be, then press this button — the motors don't move, this point is simply registered as (0,0,0).</div>
+        </div>
+
+        <div class="card">
+          <h2>Device Status</h2>
+          <div class="grid2" style="margin-bottom:14px;">
+            <div><label>Status</label><div id="statusText" style="font-family:var(--mono);font-size:14px;">Ready</div></div>
+            <div><label>Last Response</label><div id="lastResponse" style="font-family:var(--mono);font-size:14px;">—</div></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="btnRequestStatus">Request Status</button>
+            <button class="btn primary" id="btnSetZero">Set Here as Zero (0,0)</button>
+            <button class="btn danger" id="btnPause">Stop / Pause</button>
+          </div>
+          <h2 style="margin-top:18px;">Message Log</h2>
+          <div class="log" id="controlLog"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GCODE SCREEN -->
+    <section class="screen" id="screen-gcode">
+      <h1 class="page-title">G-Code File</h1>
+      <p class="page-sub">Upload a file or paste it directly to preview the path, then send it to the device.</p>
+
+      <div class="card">
+        <h2>Upload</h2>
+        <div class="file-drop" id="fileDrop">Drop a .gcode / .nc file here or click to select</div>
+        <input type="file" id="fileInput" accept=".gcode,.nc,.txt" style="display:none;">
+        <label style="margin-top:14px;">Or paste directly</label>
+        <textarea id="gcodeText" placeholder="G00 X10 Y10&#10;M03&#10;G01 X40 Y10&#10;M05"></textarea>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn" id="btnParse">Process & Preview</button>
+          <button class="btn primary" id="btnSendGcode">Send to Device</button>
+          <button class="btn danger" id="btnResumeGcode" style="display:none;">▶ Resume from Interrupted Line</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Path Preview</h2>
+        <div class="bed-wrap">
+          <canvas id="bedCanvas"></canvas>
+          <div class="bed-info" id="bedInfo">Lines: 0 · Range: —</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Send Status</h2>
+        <div class="log" id="gcodeLog"></div>
+      </div>
+    </section>
+
+    <!-- IMAGE -> GCODE SCREEN -->
+    <section class="screen" id="screen-image">
+      <h1 class="page-title">Convert Image to G-Code</h1>
+      <p class="page-sub">Upload an image; sizing it to fit the board, improving quality, and converting it to a drawing path all happen right here.</p>
+
+      <div class="card">
+        <h2>1. Upload Image</h2>
+        <div class="file-drop" id="imgDrop">Drop an image here or click to select (jpg / png)</div>
+        <input type="file" id="imgInput" accept="image/*" style="display:none;">
+      </div>
+
+      <div class="card">
+        <h2>2. Conversion Method</h2>
+        <div class="checkbox-row" style="margin-top:0;">
+          <input type="radio" name="imgMode" id="imgModeOutline" checked>
+          <label style="margin:0;color:var(--text);">Outline Tracing — for drawings/line art/cartoons (draws only the lines)</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="radio" name="imgMode" id="imgModeRaster">
+          <label style="margin:0;color:var(--text);">Halftone Raster — for real photos (shading with horizontal lines)</label>
+        </div>
+        <div class="hint">For line-art designs like coloring pages, always choose "Outline Tracing" — it follows the actual lines exactly, instead of shading the white background with horizontal lines.</div>
+      </div>
+
+      <div class="card">
+        <h2>3. Size on Paper / Board</h2>
+        <div class="grid2">
+          <div><label>Final Width (mm)</label><input type="number" id="imgWidthMm" value="100" min="5"></div>
+          <div><label>Final Height (mm) — automatic, based on image aspect ratio</label><input type="number" id="imgHeightMm" value="100" min="5" disabled></div>
+        </div>
+        <div style="margin-top:12px;">
+          <label id="lineSpacingLabel">Line-tracing precision (pixels per millimeter) <span class="range-val" id="lineSpacingVal">5.0 px/mm</span></label>
+          <input type="range" id="lineSpacing" min="2" max="10" step="0.5" value="5">
+          <div class="hint">A higher number = more accurate, smoother lines but more points and a larger file.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>4. Improve Image Quality</h2>
+        <div class="grid2">
+          <div>
+            <label>Brightness <span class="range-val" id="brightVal">0</span></label>
+            <input type="range" id="imgBrightness" min="-100" max="100" step="1" value="0">
+          </div>
+          <div>
+            <label>Contrast <span class="range-val" id="contrastVal">20</span></label>
+            <input type="range" id="imgContrast" min="-100" max="100" step="1" value="20">
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <label>Black/White Threshold <span class="range-val" id="threshVal">128</span></label>
+          <div class="range-row">
+            <input type="range" id="imgThreshold" min="0" max="255" step="1" value="128">
+            <button class="btn" id="btnAutoThresh" style="flex:none;">Auto</button>
+          </div>
+        </div>
+        <div class="checkbox-row"><input type="checkbox" id="imgSharpen" checked><label style="margin:0;color:var(--text);">Sharpen Edges</label></div>
+        <div class="checkbox-row" id="ditherRow" style="display:none;"><input type="checkbox" id="imgDither"><label style="margin:0;color:var(--text);">Dithering for smoother gradients — raster mode only</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="imgInvert"><label style="margin:0;color:var(--text);">Invert (draw the background instead of the subject)</label></div>
+      </div>
+
+      <div class="card" id="imgTraceCard">
+        <h2>5. Line Drawing Settings (outline mode only)</h2>
+        <label>Line Drawing Method</label>
+        <select id="imgTraceMethod">
+          <option value="boundary" selected>Traditional Outline — stable and continuous (recommended)</option>
+          <option value="skeleton">Centerline — thinner single line (experimental)</option>
+        </select>
+        <div class="hint">"Traditional Outline" traces all the way around each line's thickness (on thick lines you may see two parallel lines, but it's always continuous and unbroken). "Centerline" draws only the middle of each line, but on busy or low-quality images it may come out fragmented — the settings below let you control that.</div>
+
+        <div class="grid2" style="margin-top:14px;">
+          <div><label>Path simplification tolerance (px)</label><input type="number" id="imgEpsilon" value="0.7" min="0" step="0.1"></div>
+          <div><label>Minimum noise size (px)</label><input type="number" id="imgMinNoise" value="3" min="0" step="1"></div>
+        </div>
+        <div class="checkbox-row" style="margin-top:10px;"><input type="checkbox" id="imgCloseLoops" checked><label style="margin:0;color:var(--text);">Automatically close loops (fixes broken circles)</label></div>
+
+        <div class="checkbox-row" style="margin-top:10px;"><input type="checkbox" id="imgFillSolid"><label style="margin:0;color:var(--text);">Fill solid areas with hatching (Hatch Fill)</label></div>
+        <div class="hint">If the image has solid shapes (like a fully black circle), only the outline gets drawn and the inside stays empty. Turn this on to fill solid areas with parallel lines too.</div>
+        <div class="grid2" style="margin-top:10px;" id="imgFillOpts">
+          <div><label>Fill line spacing (mm)</label><input type="number" id="imgFillSpacingMm" value="0.5" min="0.1" step="0.05"></div>
+        </div>
+
+        <div id="imgSkeletonOpts" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <div class="checkbox-row" style="margin-top:0;"><input type="checkbox" id="imgMorphClose" checked><label style="margin:0;color:var(--text);">Smooth edges before thinning</label></div>
+          <label style="margin-top:10px;">Maximum spur-removal length (px) <span class="hint" style="display:inline;">— if lines are getting fragmented, lower this or set it to zero</span></label>
+          <input type="number" id="imgSpurPrune" value="4" min="0" step="1">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>6. Preview</h2>
+        <div class="compare-grid">
+          <div class="img-canvas-wrap"><span class="cap">Original Image</span><canvas id="imgOrigCanvas"></canvas></div>
+          <div class="img-canvas-wrap"><span class="cap" id="imgProcCap">Traced Path</span><canvas id="imgProcCanvas"></canvas></div>
+        </div>
+        <div id="imgStats" style="margin-top:10px;"></div>
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn primary" id="btnGenGcode">Generate G-Code</button>
+          <button class="btn" id="btnSendImgGcode">Generate & Send Directly to Device</button>
+        </div>
+        <div class="hint" id="imgGenLog" style="margin-top:8px;"></div>
+      </div>
+    </section>
+
+    <!-- HANDWRITING SCREEN -->
+    <section class="screen" id="screen-handwrite">
+      <h1 class="page-title">Convert Text to Handwriting</h1>
+      <p class="page-sub">Write your text, choose a handwriting-like font; the device will write that text on paper with the pen.</p>
+
+      <div class="card">
+        <h2>1. Text</h2>
+        <label>Text</label>
+        <textarea id="handText" dir="auto" placeholder="Write your text here..." style="font-family:var(--sans);min-height:100px;">Hello World</textarea>
+        <div class="checkbox-row"><input type="checkbox" id="handRtl" checked><label style="margin:0;color:var(--text);">Right-to-left (for Persian/Arabic text)</label></div>
+      </div>
+
+      <div class="card">
+        <h2>2. Handwriting Font</h2>
+        <label>Select Font</label>
+        <select id="handFontSelect">
+          <option value="Vazirmatn" selected>Vazirmatn (Persian, regular)</option>
+          <option value="Caveat">Caveat (Latin, handwriting)</option>
+          <option value="Dancing Script">Dancing Script (Latin, handwriting)</option>
+          <option value="Shadows Into Light">Shadows Into Light (Latin, handwriting)</option>
+          <option value="Homemade Apple">Homemade Apple (Latin, handwriting)</option>
+          <option value="Permanent Marker">Permanent Marker (Latin, marker)</option>
+          <option value="Reenie Beanie">Reenie Beanie (Latin, handwriting)</option>
+        </select>
+        <div class="hint">True handwriting-style fonts for Persian don't exist on Google Fonts. If you have a Persian handwriting font (.ttf/.otf/.woff), upload it using the button below.</div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn" id="btnHandFontUpload">📤 Upload Custom Font</button>
+        </div>
+        <input type="file" id="handFontFile" accept=".ttf,.otf,.woff,.woff2" style="display:none;">
+      </div>
+
+      <div class="card">
+        <h2>3. Size on Paper</h2>
+        <div class="grid3">
+          <div><label>Paper Width (mm)</label><input type="number" id="handWidthMm" value="150" min="20"></div>
+          <div><label>Font Size (mm)</label><input type="number" id="handFontSizeMm" value="14" min="3" step="0.5"></div>
+          <div><label>Line spacing (multiplier)</label><input type="number" id="handLineSpacing" value="1.6" min="1" step="0.1"></div>
+        </div>
+        <div style="margin-top:12px;">
+          <label>Drawing precision (pixels per millimeter) <span class="range-val" id="handPxPerMmVal">6.0 px/mm</span></label>
+          <input type="range" id="handPxPerMm" min="2" max="14" step="0.5" value="6">
+          <div class="hint">A higher number = a thinner, more precise line but more points; increase this for very thin fonts.</div>
+        </div>
+        <div style="margin-top:12px;">
+          <label>Black/White Threshold <span class="range-val" id="handThreshVal">128</span></label>
+          <input type="range" id="handThreshold" min="0" max="255" step="1" value="128">
+        </div>
+      </div>
+
+      <div class="card" id="handTraceCard">
+        <h2>4. Line Drawing Settings</h2>
+        <label>Line Drawing Method</label>
+        <select id="handTraceMethod">
+          <option value="boundary" selected>Traditional Outline — stable and continuous (recommended)</option>
+          <option value="skeleton">Centerline — thinner single line (experimental)</option>
+        </select>
+        <div class="hint">"Traditional Outline" traces all the way around the thickness of each stroke. "Centerline" draws only the middle of the stroke but may come out fragmented on small fonts.</div>
+
+        <div class="grid2" style="margin-top:14px;">
+          <div><label>Path simplification tolerance (px)</label><input type="number" id="handEpsilon" value="0.6" min="0" step="0.1"></div>
+          <div><label>Minimum noise size (px)</label><input type="number" id="handMinNoise" value="3" min="0" step="1"></div>
+        </div>
+        <div class="checkbox-row" style="margin-top:10px;"><input type="checkbox" id="handCloseLoops" checked><label style="margin:0;color:var(--text);">Automatically close loops (like round letters)</label></div>
+
+        <div id="handSkeletonOpts" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <div class="checkbox-row" style="margin-top:0;"><input type="checkbox" id="handMorphClose" checked><label style="margin:0;color:var(--text);">Smooth edges before thinning</label></div>
+          <label style="margin-top:10px;">Maximum spur-removal length (px) <span class="hint" style="display:inline;">— if lines are getting fragmented, lower this or set it to zero</span></label>
+          <input type="number" id="handSpurPrune" value="4" min="0" step="1">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>5. Preview</h2>
+        <div class="img-canvas-wrap"><span class="cap">Handwriting Preview</span><canvas id="txtPreviewCanvas"></canvas></div>
+        <div id="handStats" style="margin-top:10px;"></div>
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn" id="btnPreviewHand">Preview</button>
+          <button class="btn primary" id="btnGenHandGcode">Generate G-Code</button>
+          <button class="btn" id="btnSendHandGcode">Generate & Send Directly to Device</button>
+        </div>
+        <div class="hint" id="handLog" style="margin-top:8px;"></div>
+      </div>
+    </section>
+
+    <!-- CALIBRATION SCREEN -->
+    <section class="screen" id="screen-calib">
+      <h1 class="page-title">Calibration</h1>
+      <p class="page-sub">Steps per millimeter for each axis, based on your motor and leadscrew/pulley specs.</p>
+
+      <div class="card">
+        <h2>Steps / mm</h2>
+        <div class="grid3">
+          <div><label>Axis X</label><input type="number" id="stepsX" value="100" step="0.01"></div>
+          <div><label>Axis Y</label><input type="number" id="stepsY" value="100" step="0.01"></div>
+          <div><label>Axis Z</label><input type="number" id="stepsZ" value="100" step="0.01"></div>
+        </div>
+        <div style="margin-top:14px;">
+          <label>Jog step size (mm)</label>
+          <input type="number" id="jogStepInput" value="1" step="0.1" style="max-width:200px;">
+        </div>
+        <div style="margin-top:14px;display:flex;align-items:center;gap:10px;">
+          <input type="checkbox" id="invertZ" style="width:18px;height:18px;">
+          <label for="invertZ" style="margin:0;cursor:pointer;">Invert Z-axis direction (if the pen moves up/down backwards)</label>
+        </div>
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+          <input type="checkbox" id="mirrorX" style="width:18px;height:18px;">
+          <label for="mirrorX" style="margin:0;cursor:pointer;">Mirror X axis (if the text/image is drawn reversed on paper)</label>
+        </div>
+        <div class="hint">If the printed text or image looks mirror-reversed (left and right swapped), check this — it flips the X direction here in software, without needing to change the device firmware.</div>
+        <div class="btn-row" style="margin-top:16px;">
+          <button class="btn primary" id="btnSaveCalib">Save Settings</button>
+          <button class="btn" id="btnRequestStatus2">Request Current Status</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Current Position</h2>
+        <div class="grid3">
+          <div><label>X (mm)</label><div style="font-family:var(--mono);font-size:16px;" id="calibX">0.00</div></div>
+          <div><label>Y (mm)</label><div style="font-family:var(--mono);font-size:16px;" id="calibY">0.00</div></div>
+          <div><label>Z (mm)</label><div style="font-family:var(--mono);font-size:16px;" id="calibZ">0.00</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS SCREEN -->
+    <section class="screen" id="screen-settings">
+      <h1 class="page-title">Motion Settings</h1>
+      <p class="page-sub">The default speeds used when sending commands.</p>
+
+      <div class="card">
+        <h2>Feedrates</h2>
+        <div class="grid2">
+          <div><label>Default Feedrate</label><input type="number" id="setDefault" value="250"></div>
+          <div><label>Rapid Feedrate — movement with pen up</label><input type="number" id="setRapid" value="400"></div>
+          <div><label>Pen Feedrate — movement while drawing</label><input type="number" id="setPen" value="70"></div>
+          <div><label>Acceleration</label><input type="number" id="setAccel" value="150"></div>
+        </div>
+        <div class="hint">A lower speed means more accurate but slower drawing; a higher speed is faster but increases the risk of vibration/skipped steps. If you want higher accuracy, lower both Rapid and Pen.</div>
+      </div>
+
+      <div class="card">
+        <h2>Pause After Raising/Lowering the Pen</h2>
+        <label>Pause duration (ms)</label>
+        <input type="number" id="setPenSettleMs" value="250" min="0" step="10">
+        <div class="hint">The pen (servo) needs real physical time to fully raise or lower. Without this pause, the next move can start before it's finished, so the pen gets dragged across the paper before it's fully up, drawing an extra line between two unrelated points — exactly the kind of stray diagonal line you'd see, e.g., an eye's shading ending up drawn above the eyebrow instead of inside the eye. If you're seeing this, increase this number (e.g. 300-500).</div>
+      </div>
+
+      <div class="card">
+        <h2>Device Communication (preventing hangs/Wi-Fi drops)</h2>
+        <label>Minimum interval between sending each line (ms)</label>
+        <input type="number" id="setMinLineGapMs" value="60" min="0" step="5">
+        <div class="hint">When G-Code lines are sent one after another too quickly (for example, if the ESP32 acknowledges a line before the actual movement finishes), the ESP32's processor gets busy running the command queue and doesn't give the Wi-Fi task enough time — the result is a hang or a Wi-Fi drop mid-drawing. This number adds a mandatory pause between each line and the next (separate from the device's acknowledgment) so that, regardless of firmware behavior, sending never gets too fast. If you're still having trouble, increase this number (e.g. 50-100).</div>
+      </div>
+
+      <div class="card">
+        <h2>Drawing Order</h2>
+        <div class="checkbox-row" style="margin-top:0;"><input type="checkbox" id="setOptimizeTravel" checked><label style="margin:0;color:var(--text);">Optimize line drawing order (go to the nearest next line)</label></div>
+        <div class="hint">Instead of drawing lines in whatever order they were found in the image (which made the pen constantly jump back and forth across the image), nearby lines are drawn one after another so the pen travels less.</div>
+      </div>
+
+      <div class="card">
+        <h2>G-Code Output File Header</h2>
+        <div class="checkbox-row" style="margin-top:0;"><input type="checkbox" id="setEmbedHeader" checked><label style="margin:0;color:var(--text);">Add G90 (absolute coordinates) and G21 (millimeters) at the start of the file</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="setEmbedFeed" checked><label style="margin:0;color:var(--text);">Add speed (F) to each movement line, based on the feedrates above</label></div>
+        <div class="hint">If the G-Code file moves incorrectly without these (e.g. moving relative to the last point instead of using absolute coordinates), keep this checked.</div>
+        <div class="btn-row" style="margin-top:16px;">
+          <button class="btn primary" id="btnSaveSettings">Save Settings</button>
+          <button class="btn" id="btnResetSettings">Reset to Default</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAINT SCREEN -->
+    <section class="screen" id="screen-paint">
+      <h1 class="page-title">🖌️ Freehand Paint</h1>
+      <p class="page-sub">Draw here with your mouse or finger — the robot will replicate your strokes in real time on the paper.</p>
+
+      <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;flex-wrap:wrap;">
+
+        <!-- Canvas area -->
+        <div class="card" style="padding:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <h2 style="margin:0;">Drawing Canvas — 90×90 mm</h2>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <!-- Stroke color -->
+              <label style="margin:0;font-size:12px;color:var(--muted);">Color</label>
+              <input type="color" id="paintColor" value="#4a90d9" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--panel-2);cursor:pointer;">
+              <!-- Stroke width -->
+              <label style="margin:0;font-size:12px;color:var(--muted);">Size</label>
+              <input type="range" id="paintSize" min="1" max="20" value="4" style="width:80px;accent-color:var(--blue);">
+              <span id="paintSizeVal" style="font-family:var(--mono);font-size:11px;color:var(--text);min-width:24px;">4</span>
+            </div>
+          </div>
+
+          <!-- The paint canvas, kept square via CSS aspect-ratio -->
+          <div style="position:relative;border:2px solid var(--border);border-radius:10px;overflow:hidden;background:#07080f;aspect-ratio:1/1;max-width:560px;margin:0 auto;" id="paintCanvasWrap">
+            <canvas id="paintCanvas" style="display:block;width:100%;height:100%;cursor:crosshair;"></canvas>
+            <!-- mm readout overlay -->
+            <div id="paintCursorPos" style="position:absolute;bottom:8px;right:10px;font-family:var(--mono);font-size:10px;color:rgba(138,141,179,0.7);pointer-events:none;">X 0.0  Y 0.0 mm</div>
+            <!-- Micro grid overlay drawn by JS -->
+          </div>
+
+          <!-- Tool row -->
+          <div class="btn-row" style="margin-top:12px;justify-content:center;flex-wrap:wrap;">
+            <button class="btn" id="btnPaintUndo">↩ Undo</button>
+            <button class="btn danger" id="btnPaintClear">🗑 Clear</button>
+          </div>
+        </div>
+
+        <!-- Controls sidebar -->
+        <div style="display:flex;flex-direction:column;gap:14px;min-width:220px;">
+
+          <div class="card">
+            <h2>Robot Mode</h2>
+            <div class="checkbox-row" style="margin-top:0;">
+              <input type="checkbox" id="paintRealtime" checked style="width:16px;height:16px;accent-color:var(--teal);">
+              <label for="paintRealtime" style="margin:0;color:var(--text);font-size:13px;">Real-time send</label>
+            </div>
+            <div class="hint">When ON, each stroke is sent to the robot while you draw. When OFF, collect strokes first and send them all at once.</div>
+            <div class="btn-row" style="margin-top:12px;">
+              <button class="btn primary block" id="btnPaintSend">▶ Send All to Robot</button>
+            </div>
+            <div class="btn-row" style="margin-top:6px;">
+              <button class="btn danger block" id="btnPaintStop">⏹ Stop Robot</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Status</h2>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:6px;">Strokes drawn</div>
+            <div id="paintStrokeCount" style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--blue);">0</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:10px;margin-bottom:6px;">Robot queue</div>
+            <div id="paintQueueStatus" style="font-family:var(--mono);font-size:13px;color:var(--teal);">Idle</div>
+          </div>
+
+          <div class="card">
+            <h2>Export</h2>
+            <div class="btn-row">
+              <button class="btn block" id="btnPaintToGcode">📄 Copy as G-Code</button>
+            </div>
+            <div class="hint" style="margin-top:8px;">Copies all strokes as G-Code to the G-Code tab so you can preview or re-send.</div>
+          </div>
+
+          <div class="card">
+            <h2>Log</h2>
+            <div class="log" id="paintLog" style="height:130px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   CncCommand / CncResponse  (equivalent of the Kotlin models)
+========================================================= */
+let cmdIdCounter = 1;
+let lastSentCmdId = null;
+function makeCommand(cmd, payload){
+  lastSentCmdId = cmdIdCounter++;
+  return JSON.stringify({ id: lastSentCmdId, cmd, payload: payload || {} });
+}
+function parseResponse(raw){
+  try{
+    const d = JSON.parse(raw);
+    return { status: d.status || 'unknown', message: d.message || null, data: d.data || null, id: d.id ?? null };
+  }catch(e){
+    return { status: 'unknown', message: 'Parse error: ' + e.message, data: null, id: null };
+  }
+}
+
+/* =========================================================
+   WebSocketClient  (equivalent of WebSocketClient.kt)
+========================================================= */
+const WebSocketClient = {
+  ws: null,
+  state: 'DISCONNECTED', // DISCONNECTED | CONNECTING | CONNECTED
+  listeners: { message: [], state: [] },
+  reconnectTimer: null,
+
+  on(evt, fn){ this.listeners[evt].push(fn); },
+  emit(evt, val){ this.listeners[evt].forEach(fn => fn(val)); },
+
+  connect(ip, port){
+    this.disconnect(true);
+    const url = `ws://${ip}:${port}/`;
+    this.setState('CONNECTING');
+    log('connLog', `Connecting to ${url} ...`);
+    try{
+      this.ws = new WebSocket(url);
+    }catch(e){
+      log('connLog', `Error creating connection: ${e.message}`, 'err');
+      this.setState('DISCONNECTED');
+      return;
+    }
+    this.ws.onopen = () => {
+      this.setState('CONNECTED');
+      log('connLog', 'Connected ✔', 'ok');
+      showToast('Connected to device', false);
+    };
+    this.ws.onmessage = (evt) => {
+      this.emit('message', evt.data);
+    };
+    this.ws.onerror = () => {
+      log('connLog', 'WebSocket error', 'err');
+    };
+    this.ws.onclose = () => {
+      const wasConnected = this.state === 'CONNECTED';
+      this.setState('DISCONNECTED');
+      if (wasConnected){
+        log('connLog', 'Connection lost', 'err');
+        showToast('Disconnected from device', true);
+      }
+    };
+  },
+
+  disconnect(silent){
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.ws){
+      this.ws.onclose = null;
+      try{ this.ws.close(); }catch(e){}
+      this.ws = null;
+    }
+    this.setState('DISCONNECTED');
+    if (!silent) log('connLog', 'Connection closed manually');
+  },
+
+  isConnected(){ return this.state === 'CONNECTED'; },
+
+  setState(s){
+    this.state = s;
+    this.emit('state', s);
+  },
+
+  send(msg){
+    if (!this.isConnected()){
+      showToast('Device is not connected', true);
+      return false;
+    }
+    try{
+      this.ws.send(msg);
+      return true;
+    }catch(e){
+      log('controlLog', `Send failed: ${e.message}`, 'err');
+      return false;
+    }
+  }
+};
+
+/* =========================================================
+   GCodePathParser  (equivalent of GCodePathParser.kt)
+========================================================= */
+function parseGCodePath(lines){
+  let currentX = 0, currentY = 0, isPenDown = false;
+  const segments = [];
+  let bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+
+  function updateBounds(x,y){
+    bounds.minX = Math.min(bounds.minX, x);
+    bounds.maxX = Math.max(bounds.maxX, x);
+    bounds.minY = Math.min(bounds.minY, y);
+    bounds.maxY = Math.max(bounds.maxY, y);
+  }
+
+  for (let raw of lines){
+    const line = raw.trim();
+    if (!line || line.startsWith(';') || line.startsWith('(')) continue;
+    const tokens = line.split(/\s+/);
+    let gCode='', mCode='', xVal=null, yVal=null;
+    for (const t of tokens){
+      const c = t[0]?.toUpperCase();
+      if (c === 'G') gCode = t;
+      else if (c === 'M') mCode = t;
+      else if (c === 'X') xVal = parseFloat(t.slice(1));
+      else if (c === 'Y') yVal = parseFloat(t.slice(1));
+    }
+    const mUp = mCode.toUpperCase();
+    if (mUp === 'M03'){ isPenDown = true; continue; }
+    if (mUp === 'M05'){ isPenDown = false; continue; }
+
+    const gUp = gCode.toUpperCase();
+    if (gUp === 'G00' || gUp === 'G01'){
+      const isRapid = gUp === 'G00';
+      const startX = currentX, startY = currentY;
+      const endX = isNaN(xVal) || xVal===null ? currentX : xVal;
+      const endY = isNaN(yVal) || yVal===null ? currentY : yVal;
+      if (isPenDown || isRapid){
+        segments.push({ start:[startX,startY], end:[endX,endY], isRapid, isPenDown });
+        updateBounds(startX,startY); updateBounds(endX,endY);
+      }
+      currentX = endX; currentY = endY;
+    } else if (gUp === 'HOME' || line.toUpperCase() === 'HOME'){
+      segments.push({ start:[currentX,currentY], end:[0,0], isRapid:true, isPenDown:false });
+      updateBounds(currentX,currentY); updateBounds(0,0);
+      currentX = 0; currentY = 0;
+    }
+  }
+
+  if (bounds.minX === Infinity){
+    bounds = { minX:-10, maxX:10, minY:-10, maxY:10 };
+  } else {
+    const margin = Math.max(bounds.maxX-bounds.minX, bounds.maxY-bounds.minY) * 0.1;
+    bounds.minX -= margin; bounds.maxX += margin;
+    bounds.minY -= margin; bounds.maxY += margin;
+  }
+  return { segments, bounds, totalLines: lines.length };
+}
+
+/* =========================================================
+   Canvas bed renderer (equivalent of GCodePreview.kt)
+========================================================= */
+const canvas = document.getElementById('bedCanvas');
+const ctx = canvas.getContext('2d');
+let currentPath = { segments: [], bounds: {minX:-10,maxX:10,minY:-10,maxY:10}, totalLines:0 };
+let toolPos = {x:0,y:0};
+
+function resizeCanvas(){
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  drawBed();
+}
+window.addEventListener('resize', resizeCanvas);
+
+function drawBed(){
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = '#0a0b14';
+  ctx.fillRect(0,0,w,h);
+
+  const b = currentPath.bounds;
+  const bw = Math.max(b.maxX-b.minX, 1e-3);
+  const bh = Math.max(b.maxY-b.minY, 1e-3);
+  const pad = 30 * devicePixelRatio;
+  const scale = Math.min((w-2*pad)/bw, (h-2*pad)/bh);
+  const originX = (w - bw*scale)/2 - b.minX*scale;
+  const originY = h - ((h - bh*scale)/2 - b.minY*scale); // flip Y
+
+  function toPx(x,y){ return [originX + x*scale, originY - y*scale]; }
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  const gridStep = 10;
+  for (let gx = Math.floor(b.minX/gridStep)*gridStep; gx <= b.maxX; gx += gridStep){
+    const [px] = toPx(gx,0);
+    ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,h); ctx.stroke();
+  }
+  for (let gy = Math.floor(b.minY/gridStep)*gridStep; gy <= b.maxY; gy += gridStep){
+    const [,py] = toPx(0,gy);
+    ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(w,py); ctx.stroke();
+  }
+
+  // origin axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  const [ox,oy] = toPx(0,0);
+  ctx.beginPath(); ctx.moveTo(ox,0); ctx.lineTo(ox,h); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,oy); ctx.lineTo(w,oy); ctx.stroke();
+
+  // path segments
+  for (const seg of currentPath.segments){
+    const [x1,y1] = toPx(seg.start[0], seg.start[1]);
+    const [x2,y2] = toPx(seg.end[0], seg.end[1]);
+    ctx.beginPath();
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+    if (seg.isRapid){
+      ctx.strokeStyle = 'rgba(242,193,78,0.55)';
+      ctx.setLineDash([5*devicePixelRatio,4*devicePixelRatio]);
+      ctx.lineWidth = 1.4*devicePixelRatio;
+    } else {
+      ctx.strokeStyle = '#4a90d9';
+      ctx.setLineDash([]);
+      ctx.lineWidth = 2*devicePixelRatio;
+    }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // tool head
+  const [tx,ty] = toPx(toolPos.x, toolPos.y);
+  ctx.beginPath();
+  ctx.arc(tx,ty,6*devicePixelRatio,0,Math.PI*2);
+  ctx.fillStyle = '#00d4aa';
+  ctx.shadowColor = '#00d4aa';
+  ctx.shadowBlur = 12*devicePixelRatio;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+/* =========================================================
+   UI wiring
+========================================================= */
+function log(elId, text, cls){
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const time = new Date().toLocaleTimeString('en-GB');
+  const line = document.createElement('div');
+  line.innerHTML = `<b>[${time}]</b> <span class="${cls||''}">${text}</span>`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function showToast(msg, isError){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = isError ? 'var(--coral)' : 'var(--teal)';
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('screen-'+btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'gcode') setTimeout(resizeCanvas, 30);
+    if (btn.dataset.tab === 'image') setTimeout(()=>{ resizeImgCanvases(); renderImagePreview(); }, 30);
+    if (btn.dataset.tab === 'handwrite') setTimeout(()=>{ renderTextPreview(); }, 30);
+  });
+});
+
+// Connection URL preview
+function updateUrlPreview(){
+  const ip = document.getElementById('espIp').value || '192.168.4.1';
+  const port = document.getElementById('espPort').value || '81';
+  document.getElementById('wsUrlPreview').textContent = `Connection address: ws://${ip}:${port}/`;
+}
+document.getElementById('espIp').addEventListener('input', updateUrlPreview);
+document.getElementById('espPort').addEventListener('input', updateUrlPreview);
+
+document.getElementById('btnConnect').addEventListener('click', ()=>{
+  const ip = document.getElementById('espIp').value.trim();
+  const port = document.getElementById('espPort').value.trim() || '81';
+  if (!ip){ showToast('Enter the IP address', true); return; }
+  WebSocketClient.connect(ip, port);
+  localStorage.setItem('cnc_ip', ip);
+  localStorage.setItem('cnc_port', port);
+});
+document.getElementById('btnDisconnect').addEventListener('click', ()=>{
+  WebSocketClient.disconnect();
+});
+
+// Connection state -> UI
+WebSocketClient.on('state', (state)=>{
+  const pill = document.getElementById('connPill');
+  const label = document.getElementById('connLabel');
+  pill.classList.remove('on','busy');
+  document.getElementById('btnConnect').disabled = state !== 'DISCONNECTED';
+  document.getElementById('btnDisconnect').disabled = state === 'DISCONNECTED';
+  if (state === 'CONNECTED'){ pill.classList.add('on'); label.textContent = 'Connected'; requestStatus(); }
+  else if (state === 'CONNECTING'){ pill.classList.add('busy'); label.textContent = 'Connecting...'; }
+  else { label.textContent = 'Disconnected'; }
+});
+
+// Incoming messages -> update state (mirrors handleIncomingMessage in ViewModels)
+WebSocketClient.on('message', (raw)=>{
+  const res = parseResponse(raw);
+  log('controlLog', `${res.status}: ${res.message || raw}`, res.status==='error'?'err':'ok');
+  document.getElementById('lastResponse').textContent = res.message || res.status;
+
+  if (res.data){
+    const {x,y,z} = res.data;
+    if (x!==undefined && y!==undefined && z!==undefined){
+      document.getElementById('hudX').textContent = Number(x).toFixed(2);
+      document.getElementById('hudY').textContent = Number(y).toFixed(2);
+      document.getElementById('hudZ').textContent = Number(z).toFixed(2);
+      document.getElementById('calibX').textContent = Number(x).toFixed(2);
+      document.getElementById('calibY').textContent = Number(y).toFixed(2);
+      document.getElementById('calibZ').textContent = Number(z).toFixed(2);
+      toolPos = {x:Number(x), y:Number(y)};
+      drawBed();
+    }
+  }
+
+  if (res.status === 'ok') document.getElementById('statusText').textContent = 'Ready';
+  else if (res.status === 'busy') document.getElementById('statusText').textContent = 'Moving';
+  else if (res.status === 'error') { document.getElementById('statusText').textContent = 'Error'; showToast(res.message || 'Device error', true); }
+
+  // ---- Ack dispatch for synchronizing G-code sending ----
+  // After finishing each move, the firmware sends a "moved" or "pen_moved" message,
+  // and for non-movement lines it sends "ignored_line" / "empty_line". Each of these
+  // is treated as the acknowledgment that the current line has finished executing.
+  // If the response has an id, only the response matching the line we're actually
+  // waiting for is accepted — previously any "moved" message (even a delayed ACK
+  // from a previous line) was accepted, which caused sending to move on to the next
+  // line too early while the device was still executing the previous one; this
+  // caused position to get lost and lines to land in the wrong place.
+  const ackMsgs = ['moved','pen_moved','ignored_line','empty_line'];
+  const idOk = (res.id == null || AckWaiter._waitingForId == null) ? true : (res.id === AckWaiter._waitingForId);
+  if (idOk && res.status === 'ok' && ackMsgs.includes(res.message)) {
+    if (AckWaiter._resolve) { const r = AckWaiter._resolve; AckWaiter._resolve = null; AckWaiter._waitingForId = null; r(true); }
+  } else if (idOk && res.status === 'error') {
+    if (AckWaiter._resolve) { const r = AckWaiter._resolve; AckWaiter._resolve = null; AckWaiter._waitingForId = null; r(false); }
+  }
+});
+
+// Waiting for the ESP32's acknowledgment that a line has finished executing
+const AckWaiter = {
+  _resolve: null,
+  _waitingForId: null,
+  wait(timeoutMs, cmdId){
+    this._waitingForId = cmdId != null ? cmdId : null;
+    return new Promise(resolve=>{
+      this._resolve = resolve;
+      setTimeout(()=>{
+        if (this._resolve === resolve) { this._resolve = null; this._waitingForId = null; resolve(true); } // timeout → continue so it doesn't lock up
+      }, timeoutMs);
+    });
+  },
+  cancel(){ if (this._resolve){ const r = this._resolve; this._resolve = null; this._waitingForId = null; r(false); } }
+};
+let gcodeSendAbort = false;
+
+// Jog controls
+let jogStep = 1;
+document.querySelectorAll('#stepSelect button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('#stepSelect button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    jogStep = parseFloat(b.dataset.step);
+  });
+});
+document.querySelectorAll('[data-jog]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const dir = b.dataset.jog;
+    const axis = dir[0];
+    const sign = dir[1] === '+' ? 1 : -1;
+    WebSocketClient.send(makeCommand('jog', { axis, dist: sign*jogStep }));
+    log('controlLog', `jog ${axis} ${sign*jogStep}mm`);
+  });
+});
+document.querySelector('[data-action="home"]').addEventListener('click', ()=>{
+  WebSocketClient.send(makeCommand('home', {}));
+  log('controlLog', 'Sending home command');
+});
+document.getElementById('btnSetZero').addEventListener('click', ()=>{
+  WebSocketClient.send(makeCommand('set_zero', {}));
+  log('controlLog', 'This point registered as zero (0,0,0)');
+  showToast('New origin registered', false);
+});
+function requestStatus(){
+  WebSocketClient.send(makeCommand('status', {}));
+}
+document.getElementById('btnRequestStatus').addEventListener('click', requestStatus);
+document.getElementById('btnSetZero').addEventListener('click', ()=>{
+  WebSocketClient.send(makeCommand('set_zero', {}));
+  log('controlLog', 'Current point set as zero (0,0)');
+  showToast('Origin (0,0) set to the current point', false);
+});
+document.getElementById('btnRequestStatus2').addEventListener('click', requestStatus);
+document.getElementById('btnPause').addEventListener('click', ()=>{
+  WebSocketClient.send(makeCommand('pause', {}));
+  log('controlLog', 'Sending stop command');
+  gcodeSendAbort = true;
+  AckWaiter.cancel();
+});
+
+// G-Code screen
+const fileDrop = document.getElementById('fileDrop');
+const fileInput = document.getElementById('fileInput');
+fileDrop.addEventListener('click', ()=>fileInput.click());
+['dragover','dragleave','drop'].forEach(evt=>{
+  fileDrop.addEventListener(evt, e=>{
+    e.preventDefault();
+    fileDrop.classList.toggle('drag', evt==='dragover');
+  });
+});
+fileDrop.addEventListener('drop', e=>{
+  const file = e.dataTransfer.files[0];
+  if (file) readGcodeFile(file);
+});
+fileInput.addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if (file) readGcodeFile(file);
+});
+function readGcodeFile(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    document.getElementById('gcodeText').value = reader.result;
+    parseAndPreview();
+  };
+  reader.readAsText(file);
+}
+document.getElementById('btnParse').addEventListener('click', parseAndPreview);
+function parseAndPreview(){
+  const text = document.getElementById('gcodeText').value;
+  const lines = text.split('\n');
+  if (!text.trim()){ showToast('Enter the G-Code content first', true); return; }
+  currentPath = parseGCodePath(lines);
+  toolPos = {x:0,y:0};
+  resizeCanvas();
+  const b = currentPath.bounds;
+  document.getElementById('bedInfo').textContent =
+    `Lines: ${currentPath.totalLines} · Range X[${b.minX.toFixed(1)}..${b.maxX.toFixed(1)}] Y[${b.minY.toFixed(1)}..${b.maxY.toFixed(1)}]`;
+  log('gcodeLog', `Processed: ${currentPath.segments.length} path segments`);
+}
+let lastGcodeSendLines = null;
+let lastGcodeSendIndex = 0;
+function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function sendGcodeText(text, logElId, startIndex){
+  logElId = logElId || 'gcodeLog';
+  if (!text.trim()){ showToast('Nothing to send', true); return; }
+  if (!WebSocketClient.isConnected()){ showToast('Connect first', true); return; }
+  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l && !l.startsWith(';') && !l.startsWith('('));
+  lastGcodeSendLines = lines;
+  const from = startIndex > 0 ? Math.min(startIndex, lines.length - 1) : 0;
+  log(logElId, from > 0 ? `Resuming send from line ${from+1} of ${lines.length}...` : `Starting send of ${lines.length} lines...`);
+  gcodeSendAbort = false;
+  const ACK_TIMEOUT_MS = 20000; // if no ACK arrives within this time, move on so things don't lock up
+  // Regardless of how early or late the device's ACK arrives (or whether it
+  // echoes the id at all), this enforces a minimum pause between each line and
+  // the next. Without this, if the firmware sends a stray/premature "moved"
+  // message, line-by-line sending would continue at network speed (far faster
+  // than the ESP32's actual CPU/Wi-Fi stack can keep up with) and cause a hang
+  // or Wi-Fi drop — this limit prevents "sending everything all at once".
+  const minGapMs = getMotionSettings().minLineGapMs;
+
+  const stoppedEarly = (i, reason) => {
+    lastGcodeSendIndex = i;
+    log(logElId, `${reason} — stopped at line ${i+1} of ${lines.length}`, 'err');
+    document.getElementById('btnResumeGcode').style.display = '';
+    showToast('Sending stopped; you can resume from this line', true);
+  };
+
+  for (let i=from;i<lines.length;i++){
+    if (gcodeSendAbort){ stoppedEarly(i, 'Sending stopped manually'); return; }
+    if (!WebSocketClient.isConnected()){ stoppedEarly(i, 'Connection lost'); return; }
+    try{
+      // We only send the next line once the previous line's ACK has arrived (send-and-wait)
+      AckWaiter.cancel(); // discard any leftover previous ACK
+      const msg = makeCommand('gcode_line', { line: lines[i], index: i, total: lines.length });
+      const ackPromise = AckWaiter.wait(ACK_TIMEOUT_MS, lastSentCmdId);
+      const sent = WebSocketClient.send(msg);
+      if (!sent){ stoppedEarly(i, 'Failed to send line'); return; }
+      await ackPromise;
+      if (minGapMs > 0) await sleep(minGapMs);
+    }catch(err){
+      stoppedEarly(i, `Unexpected error: ${err.message}`);
+      return;
+    }
+  }
+  lastGcodeSendIndex = 0;
+  document.getElementById('btnResumeGcode').style.display = 'none';
+  log(logElId, 'Send complete ✔', 'ok');
+  showToast('G-Code file sent', false);
+}
+document.getElementById('btnSendGcode').addEventListener('click', ()=>{
+  document.getElementById('btnResumeGcode').style.display = 'none';
+  sendGcodeText(document.getElementById('gcodeText').value, 'gcodeLog');
+});
+document.getElementById('btnResumeGcode').addEventListener('click', ()=>{
+  sendGcodeText(document.getElementById('gcodeText').value, 'gcodeLog', lastGcodeSendIndex);
+});
+
+/* =========================================================
+   Calibration + Settings (persisted via localStorage,
+   equivalent of DataStore in the Android app)
+========================================================= */
+function loadPersisted(){
+  const ip = localStorage.getItem('cnc_ip'); if (ip) document.getElementById('espIp').value = ip;
+  const port = localStorage.getItem('cnc_port'); if (port) document.getElementById('espPort').value = port;
+  updateUrlPreview();
+
+  const calib = JSON.parse(localStorage.getItem('cnc_calib') || 'null');
+  if (calib){
+    document.getElementById('stepsX').value = calib.stepsX;
+    document.getElementById('stepsY').value = calib.stepsY;
+    document.getElementById('stepsZ').value = calib.stepsZ;
+    document.getElementById('jogStepInput').value = calib.jogStep;
+    document.getElementById('invertZ').checked = !!calib.invertZ;
+    document.getElementById('mirrorX').checked = !!calib.mirrorX;
+  }
+  const settings = JSON.parse(localStorage.getItem('cnc_settings') || 'null');
+  if (settings){
+    document.getElementById('setDefault').value = settings.default;
+    document.getElementById('setRapid').value = settings.rapid;
+    document.getElementById('setPen').value = settings.pen;
+    document.getElementById('setAccel').value = settings.accel;
+    if (settings.penSettleMs !== undefined) document.getElementById('setPenSettleMs').value = settings.penSettleMs;
+    if (settings.embedHeader !== undefined) document.getElementById('setEmbedHeader').checked = !!settings.embedHeader;
+    if (settings.embedFeed !== undefined) document.getElementById('setEmbedFeed').checked = !!settings.embedFeed;
+    if (settings.optimizeTravel !== undefined) document.getElementById('setOptimizeTravel').checked = !!settings.optimizeTravel;
+    if (settings.minLineGapMs !== undefined) document.getElementById('setMinLineGapMs').value = settings.minLineGapMs;
+  }
+}
+
+document.getElementById('btnSaveCalib').addEventListener('click', ()=>{
+  const calib = {
+    stepsX: parseFloat(document.getElementById('stepsX').value)||100,
+    stepsY: parseFloat(document.getElementById('stepsY').value)||100,
+    stepsZ: parseFloat(document.getElementById('stepsZ').value)||100,
+    jogStep: parseFloat(document.getElementById('jogStepInput').value)||1,
+    invertZ: document.getElementById('invertZ').checked,
+    mirrorX: document.getElementById('mirrorX').checked
+  };
+  localStorage.setItem('cnc_calib', JSON.stringify(calib));
+  WebSocketClient.send(makeCommand('set_calibration', calib));
+  showToast('Calibration settings saved', false);
+});
+
+document.getElementById('btnSaveSettings').addEventListener('click', ()=>{
+  const s = {
+    default: parseFloat(document.getElementById('setDefault').value)||250,
+    rapid: parseFloat(document.getElementById('setRapid').value)||400,
+    pen: parseFloat(document.getElementById('setPen').value)||70,
+    accel: parseFloat(document.getElementById('setAccel').value)||150,
+    penSettleMs: parseFloat(document.getElementById('setPenSettleMs').value)||250,
+    embedHeader: document.getElementById('setEmbedHeader').checked,
+    embedFeed: document.getElementById('setEmbedFeed').checked,
+    optimizeTravel: document.getElementById('setOptimizeTravel').checked,
+    minLineGapMs: parseFloat(document.getElementById('setMinLineGapMs').value)||60
+  };
+  localStorage.setItem('cnc_settings', JSON.stringify(s));
+  WebSocketClient.send(makeCommand('set_settings', s));
+  showToast('Motion settings saved', false);
+});
+document.getElementById('btnResetSettings').addEventListener('click', ()=>{
+  document.getElementById('setDefault').value = 250;
+  document.getElementById('setRapid').value = 400;
+  document.getElementById('setPen').value = 70;
+  document.getElementById('setAccel').value = 150;
+  document.getElementById('setPenSettleMs').value = 250;
+  document.getElementById('setEmbedHeader').checked = true;
+  document.getElementById('setEmbedFeed').checked = true;
+  document.getElementById('setOptimizeTravel').checked = true;
+  document.getElementById('setMinLineGapMs').value = 60;
+});
+
+// Shared by every G-Code generator (outline, raster, handwriting) so speed/
+// dwell/header settings actually end up baked into the exported file instead
+// of only living as a device-side default that a fresh file wouldn't carry.
+function getMotionSettings(){
+  return {
+    rapidF: parseFloat(document.getElementById('setRapid').value) || 400,
+    penF: parseFloat(document.getElementById('setPen').value) || 70,
+    // A minimum of 150ms is always applied, even if the user left it at zero or empty.
+    // Without this minimum, the next rapid move can start before the pen servo has
+    // fully raised/lowered, dragging a diagonal line across the drawing (exactly the
+    // stray diagonal line seen in some outputs).
+    settleMs: Math.max(150, parseFloat(document.getElementById('setPenSettleMs').value) || 0),
+    embedHeader: document.getElementById('setEmbedHeader').checked,
+    embedFeed: document.getElementById('setEmbedFeed').checked,
+    optimizeTravel: document.getElementById('setOptimizeTravel').checked,
+    minLineGapMs: parseFloat(document.getElementById('setMinLineGapMs').value) || 60
+  };
+}
+
+/* =========================================================
+   Image -> G-Code module
+   Pipeline: upload -> fit to bed size (mm) -> grayscale ->
+   brightness/contrast -> optional sharpen -> threshold or
+   dither -> binary grid -> boustrophedon raster G-Code
+========================================================= */
+let uploadedImage = null;
+let lastGrayArray = null;   // cached for the "auto threshold" button
+let lastGrid = null;        // {cols, rows, mode, ...}
+let lastBinary = null;      // Uint8Array, 1 = dark
+let lastContours = null;    // array of [ [x,y], ... ] pixel-space paths, outline mode only
+let lastFillPaths = [];     // array of [ [x,y],[x,y] ] hatch-fill segments, outline mode only
+
+const imgOrigCanvas = document.getElementById('imgOrigCanvas');
+const imgProcCanvas = document.getElementById('imgProcCanvas');
+const imgOrigCtx = imgOrigCanvas.getContext('2d');
+const imgProcCtx = imgProcCanvas.getContext('2d');
+
+function resizeImgCanvases(){
+  [imgOrigCanvas, imgProcCanvas].forEach(c=>{
+    const r = c.getBoundingClientRect();
+    c.width = Math.max(1, r.width * devicePixelRatio);
+    c.height = Math.max(1, r.height * devicePixelRatio);
+  });
+}
+
+// ---- upload wiring ----
+const imgDrop = document.getElementById('imgDrop');
+const imgInput = document.getElementById('imgInput');
+imgDrop.addEventListener('click', ()=>imgInput.click());
+['dragover','dragleave','drop'].forEach(evt=>{
+  imgDrop.addEventListener(evt, e=>{ e.preventDefault(); imgDrop.classList.toggle('drag', evt==='dragover'); });
+});
+imgDrop.addEventListener('drop', e=>{ const f = e.dataTransfer.files[0]; if (f) loadImageFile(f); });
+imgInput.addEventListener('change', e=>{ const f = e.target.files[0]; if (f) loadImageFile(f); });
+
+function loadImageFile(file){
+  if (!file.type.startsWith('image/')){ showToast('The selected file is not an image', true); return; }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = new Image();
+    img.onload = ()=>{
+      uploadedImage = img;
+      updateHeightFromAspect();
+      resizeImgCanvases();
+      // Every image has different brightness/contrast; a leftover fixed threshold
+      // (e.g. from a previous image) can cause lines to disappear entirely or blend
+      // together. So on every new upload, we auto-compute the threshold for that
+      // image using Otsu's method.
+      renderImagePreview(); // populate lastGrayArray for the Otsu calculation
+      if (lastGrayArray){
+        const t = otsuThreshold(lastGrayArray);
+        document.getElementById('imgThreshold').value = t;
+        document.getElementById('threshVal').textContent = t;
+      }
+      renderImagePreview();
+      log('imgGenLog', `Image loaded: ${img.naturalWidth}×${img.naturalHeight}px — auto threshold: ${document.getElementById('imgThreshold').value}`);
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateHeightFromAspect(){
+  if (!uploadedImage) return;
+  const w = parseFloat(document.getElementById('imgWidthMm').value) || 100;
+  const aspect = uploadedImage.naturalHeight / uploadedImage.naturalWidth;
+  document.getElementById('imgHeightMm').value = (w * aspect).toFixed(1);
+}
+
+// ---- live control bindings ----
+const debouncedRender = debounce(renderImagePreview, 150);
+['imgWidthMm'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', ()=>{ updateHeightFromAspect(); debouncedRender(); });
+});
+document.getElementById('lineSpacing').addEventListener('input', (e)=>{
+  const v = parseFloat(e.target.value);
+  document.getElementById('lineSpacingVal').textContent = isOutlineMode() ? v.toFixed(1)+' px/mm' : v.toFixed(2)+'mm';
+  debouncedRender();
+});
+document.getElementById('imgBrightness').addEventListener('input', (e)=>{
+  document.getElementById('brightVal').textContent = e.target.value;
+  debouncedRender();
+});
+document.getElementById('imgContrast').addEventListener('input', (e)=>{
+  document.getElementById('contrastVal').textContent = e.target.value;
+  debouncedRender();
+});
+document.getElementById('imgThreshold').addEventListener('input', (e)=>{
+  document.getElementById('threshVal').textContent = e.target.value;
+  debouncedRender();
+});
+['imgSharpen','imgDither','imgInvert'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', renderImagePreview);
+});
+document.getElementById('btnAutoThresh').addEventListener('click', ()=>{
+  if (!lastGrayArray){ showToast('Upload an image first', true); return; }
+  const t = otsuThreshold(lastGrayArray);
+  document.getElementById('imgThreshold').value = t;
+  document.getElementById('threshVal').textContent = t;
+  renderImagePreview();
+});
+
+function isOutlineMode(){ return document.getElementById('imgModeOutline').checked; }
+
+['imgModeOutline','imgModeRaster'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', onModeChange);
+});
+function onModeChange(){
+  const outline = isOutlineMode();
+  const slider = document.getElementById('lineSpacing');
+  const label = document.getElementById('lineSpacingLabel');
+  document.getElementById('ditherRow').style.display = outline ? 'none' : '';
+  document.getElementById('imgTraceCard').style.display = outline ? '' : 'none';
+  document.getElementById('imgProcCap').textContent = outline ? 'Traced Path' : 'After Processing (black/white)';
+  if (outline){
+    slider.min = 2; slider.max = 10; slider.step = 0.5;
+    if (slider.value < 2 || slider.value > 10) slider.value = 5;
+    label.firstChild.textContent = 'Line-tracing precision (pixels per millimeter) ';
+    document.getElementById('lineSpacingVal').textContent = parseFloat(slider.value).toFixed(1)+' px/mm';
+  } else {
+    slider.min = 0.15; slider.max = 1.5; slider.step = 0.05;
+    if (slider.value < 0.15 || slider.value > 1.5) slider.value = 0.4;
+    label.firstChild.textContent = 'Scan line spacing — image precision (mm) ';
+    document.getElementById('lineSpacingVal').textContent = parseFloat(slider.value).toFixed(2)+'mm';
+  }
+  renderImagePreview();
+}
+
+function debounce(fn, ms){
+  let t;
+  return (...args)=>{ clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
+}
+
+function updateImgTraceOptsVisibility(){
+  const isSkeleton = document.getElementById('imgTraceMethod').value === 'skeleton';
+  document.getElementById('imgSkeletonOpts').style.display = isSkeleton ? '' : 'none';
+}
+document.getElementById('imgTraceMethod').addEventListener('change', ()=>{ updateImgTraceOptsVisibility(); renderImagePreview(); });
+['imgEpsilon','imgMinNoise','imgSpurPrune'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', debouncedRender);
+});
+['imgCloseLoops','imgMorphClose','imgFillSolid'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', renderImagePreview);
+});
+document.getElementById('imgFillSpacingMm').addEventListener('input', debouncedRender);
+updateImgTraceOptsVisibility();
+
+function currentImgTraceOpts(){
+  return {
+    method: document.getElementById('imgTraceMethod').value,
+    epsilon: parseFloat(document.getElementById('imgEpsilon').value) || 0.7,
+    minNoisePx: parseInt(document.getElementById('imgMinNoise').value, 10) || 0,
+    closeLoops: document.getElementById('imgCloseLoops').checked,
+    morphClose: document.getElementById('imgMorphClose').checked,
+    spurPruneLen: parseInt(document.getElementById('imgSpurPrune').value, 10) || 0
+  };
+}
+
+// ---- core pipeline ----
+function renderImagePreview(){
+  drawOriginalPreview();
+  if (!uploadedImage) return;
+
+  const outline = isOutlineMode();
+  const widthMm = parseFloat(document.getElementById('imgWidthMm').value) || 100;
+  const heightMm = parseFloat(document.getElementById('imgHeightMm').value) || 100;
+  const sliderVal = parseFloat(document.getElementById('lineSpacing').value) || (outline ? 5 : 0.4);
+
+  let cols, rows;
+  if (outline){
+    cols = Math.max(20, Math.round(widthMm * sliderVal));
+    rows = Math.max(20, Math.round(heightMm * sliderVal));
+  } else {
+    cols = Math.max(4, Math.round(widthMm / sliderVal));
+    rows = Math.max(4, Math.round(heightMm / sliderVal));
+  }
+  lastGrid = { cols, rows, widthMm, heightMm, spacing: sliderVal, mode: outline ? 'outline' : 'raster' };
+
+  // Downsample/upsample the source image to the working grid resolution.
+  // The browser's bilinear scaling here doubles as the "resize + smooth" step.
+  const work = document.createElement('canvas');
+  work.width = cols; work.height = rows;
+  const wctx = work.getContext('2d');
+  wctx.imageSmoothingEnabled = true;
+  wctx.imageSmoothingQuality = 'high';
+  wctx.drawImage(uploadedImage, 0, 0, cols, rows);
+  const imgData = wctx.getImageData(0, 0, cols, rows);
+
+  const brightness = parseFloat(document.getElementById('imgBrightness').value);
+  const contrast = parseFloat(document.getElementById('imgContrast').value);
+  const sharpen = document.getElementById('imgSharpen').checked;
+  const dither = !outline && document.getElementById('imgDither').checked;
+  const invert = document.getElementById('imgInvert').checked;
+  const threshold = parseFloat(document.getElementById('imgThreshold').value);
+
+  let gray = toGrayscale(imgData, cols, rows, brightness, contrast);
+  if (sharpen) gray = sharpenGray(gray, cols, rows);
+  lastGrayArray = gray;
+
+  let binary;
+  if (dither) binary = floydSteinbergDither(gray, cols, rows, threshold);
+  else binary = thresholdGray(gray, threshold);
+
+  if (invert) for (let i=0;i<binary.length;i++) binary[i] = binary[i] ? 0 : 1;
+  lastBinary = binary;
+
+  if (outline){
+    const traceOpts = currentImgTraceOpts();
+    lastContours = extractContours(binary, cols, rows, traceOpts);
+    const fillOn = document.getElementById('imgFillSolid').checked;
+    if (fillOn){
+      const cleaned = removeSmallComponents(binary, cols, rows, traceOpts.minNoisePx);
+      const spacingMm = parseFloat(document.getElementById('imgFillSpacingMm').value) || 0.5;
+      lastFillPaths = generateHatchFillPaths(cleaned, cols, rows, heightMm, spacingMm);
+    } else {
+      lastFillPaths = [];
+    }
+    drawContourPreview(lastContours, cols, rows, lastFillPaths);
+    updateImgStatsOutline(cols, rows, lastContours, lastFillPaths);
+  } else {
+    lastContours = null;
+    drawProcessedPreview(binary, cols, rows);
+    updateImgStats(cols, rows, sliderVal, binary);
+  }
+}
+
+function drawOriginalPreview(){
+  const w = imgOrigCanvas.width, h = imgOrigCanvas.height;
+  imgOrigCtx.clearRect(0,0,w,h);
+  imgOrigCtx.fillStyle = '#0a0b14';
+  imgOrigCtx.fillRect(0,0,w,h);
+  if (!uploadedImage) return;
+  const ir = uploadedImage.naturalWidth / uploadedImage.naturalHeight;
+  const cr = w / h;
+  let dw, dh;
+  if (ir > cr){ dw = w; dh = w / ir; } else { dh = h; dw = h * ir; }
+  imgOrigCtx.drawImage(uploadedImage, (w-dw)/2, (h-dh)/2, dw, dh);
+}
+
+function toGrayscale(imgData, cols, rows, brightness, contrast){
+  const out = new Float32Array(cols*rows);
+  const d = imgData.data;
+  const f = (259*(contrast*2.55+255)) / (255*(259-contrast*2.55));
+  for (let i=0, p=0; i<d.length; i+=4, p++){
+    let v = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    v = f*(v-128) + 128 + brightness;
+    out[p] = Math.max(0, Math.min(255, v));
+  }
+  return out;
+}
+
+function sharpenGray(gray, cols, rows){
+  const out = new Float32Array(gray.length);
+  const k = [0,-1,0,-1,5,-1,0,-1,0];
+  for (let y=0;y<rows;y++){
+    for (let x=0;x<cols;x++){
+      let sum = 0, ki = 0;
+      for (let dy=-1;dy<=1;dy++){
+        for (let dx=-1;dx<=1;dx++, ki++){
+          const xx = Math.min(cols-1, Math.max(0, x+dx));
+          const yy = Math.min(rows-1, Math.max(0, y+dy));
+          sum += gray[yy*cols+xx] * k[ki];
+        }
+      }
+      out[y*cols+x] = Math.max(0, Math.min(255, sum));
+    }
+  }
+  return out;
+}
+
+function thresholdGray(gray, threshold){
+  const out = new Uint8Array(gray.length);
+  for (let i=0;i<gray.length;i++) out[i] = gray[i] < threshold ? 1 : 0; // dark = draw
+  return out;
+}
+
+function floydSteinbergDither(gray, cols, rows, threshold){
+  const buf = Float32Array.from(gray);
+  const out = new Uint8Array(cols*rows);
+  for (let y=0;y<rows;y++){
+    for (let x=0;x<cols;x++){
+      const i = y*cols+x;
+      const old = buf[i];
+      const newVal = old < threshold ? 0 : 255;
+      out[i] = newVal === 0 ? 1 : 0; // dark = draw
+      const err = old - newVal;
+      if (x+1<cols) buf[i+1] += err*7/16;
+      if (y+1<rows){
+        if (x>0) buf[i+cols-1] += err*3/16;
+        buf[i+cols] += err*5/16;
+        if (x+1<cols) buf[i+cols+1] += err*1/16;
+      }
+    }
+  }
+  return out;
+}
+
+function otsuThreshold(gray){
+  const hist = new Array(256).fill(0);
+  for (const v of gray) hist[Math.round(v)]++;
+  const total = gray.length;
+  let sum = 0; for (let i=0;i<256;i++) sum += i*hist[i];
+  let sumB=0, wB=0, max=0, threshold=128;
+  for (let i=0;i<256;i++){
+    wB += hist[i]; if (wB===0) continue;
+    const wF = total - wB; if (wF===0) break;
+    sumB += i*hist[i];
+    const mB = sumB/wB, mF = (sum-sumB)/wF;
+    const between = wB*wF*(mB-mF)*(mB-mF);
+    if (between > max){ max = between; threshold = i; }
+  }
+  return threshold;
+}
+
+function drawProcessedPreview(binary, cols, rows){
+  const w = imgProcCanvas.width, h = imgProcCanvas.height;
+  imgProcCtx.clearRect(0,0,w,h);
+  imgProcCtx.fillStyle = '#0a0b14';
+  imgProcCtx.fillRect(0,0,w,h);
+  const cr = w/h, ir = cols/rows;
+  let dw, dh;
+  if (ir > cr){ dw = w; dh = w/ir; } else { dh = h; dw = h*ir; }
+  const ox = (w-dw)/2, oy = (h-dh)/2;
+  const cellW = dw/cols, cellH = dh/rows;
+  imgProcCtx.fillStyle = '#e9eaf5';
+  for (let y=0;y<rows;y++){
+    for (let x=0;x<cols;x++){
+      if (binary[y*cols+x]) imgProcCtx.fillRect(ox+x*cellW, oy+y*cellH, cellW+0.6, cellH+0.6);
+    }
+  }
+}
+
+/* =========================================================
+   Outline tracing: connected components -> morphological
+   smoothing -> Zhang-Suen thinning (centerline skeleton) ->
+   spur pruning -> graph trace -> Douglas-Peucker simplify ->
+   polyline G-Code.
+   A single drawn stroke has real width once thresholded to
+   black/white pixels. Tracing the *outer boundary* of that
+   filled blob walks up one edge of the stroke and back down
+   the other — that's the "one line becomes two parallel
+   lines" bug. Reducing the stroke to a 1px centerline first,
+   then tracing that skeleton as a line graph, fixes it: a
+   line stays one line, and a circle (open or filled) is one
+   closed loop instead of two concentric ones.
+========================================================= */
+const MOORE_DIRS = [[-1,0],[-1,-1],[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1]];
+
+function traceBoundary(isFg, startX, startY, maxSteps){
+  const boundary = [[startX, startY]];
+  let current = [startX, startY];
+  let backtrackDir = 0; // "west"
+  let steps = 0;
+  while (steps < maxSteps){
+    let found = false;
+    for (let i=0;i<8;i++){
+      const dIdx = (backtrackDir + 1 + i) % 8;
+      const nx = current[0] + MOORE_DIRS[dIdx][0];
+      const ny = current[1] + MOORE_DIRS[dIdx][1];
+      if (isFg(nx, ny)){
+        current = [nx, ny];
+        backtrackDir = (dIdx + 4) % 8;
+        found = true;
+        break;
+      }
+    }
+    if (!found) break; // isolated single pixel
+    steps++;
+    if (current[0] === startX && current[1] === startY) break; // closed the loop
+    boundary.push(current);
+  }
+  return boundary;
+}
+
+function topLeftOf(pixels, cols){
+  let best = pixels[0];
+  for (const idx of pixels){
+    const y = (idx/cols)|0, by = (best/cols)|0;
+    if (y < by || (y===by && (idx%cols) < (best%cols))) best = idx;
+  }
+  return best;
+}
+
+function closeLoop(path){
+  // traceBoundary stops the instant it re-touches the start pixel, without
+  // re-appending that pixel — so the path always ends one step short of
+  // where it began, leaving a tiny gap when the pen lifts. Since every
+  // contour here is the perimeter of a filled region (always a closed
+  // shape), snap it shut by returning to the exact start point. A little
+  // overlap at the join is fine — a gap is not.
+  if (path.length < 2) return path;
+  const first = path[0], last = path[path.length-1];
+  if (first[0] === last[0] && first[1] === last[1]) return path;
+  return path.concat([first]);
+}
+
+function labelComponents(pred, cols, rows){
+  const labels = new Int32Array(cols*rows).fill(-1);
+  const components = [];
+  for (let start=0; start<cols*rows; start++){
+    if (labels[start] !== -1 || !pred(start)) continue;
+    const compId = components.length;
+    const pixels = [];
+    let touchesBorder = false;
+    const stack = [start];
+    labels[start] = compId;
+    while (stack.length){
+      const idx = stack.pop();
+      pixels.push(idx);
+      const x = idx % cols, y = (idx / cols) | 0;
+      if (x===0||y===0||x===cols-1||y===rows-1) touchesBorder = true;
+      const nbrs = [[x-1,y],[x+1,y],[x,y-1],[x,y+1]];
+      for (const [nx,ny] of nbrs){
+        if (nx<0||ny<0||nx>=cols||ny>=rows) continue;
+        const nIdx = ny*cols+nx;
+        if (labels[nIdx]===-1 && pred(nIdx)){ labels[nIdx]=compId; stack.push(nIdx); }
+      }
+    }
+    components.push({ pixels, touchesBorder });
+  }
+  return { labels, components };
+}
+
+function removeSmallComponents(binary, cols, rows, minPixels){
+  const { components } = labelComponents(idx => binary[idx]===1, cols, rows);
+  const out = new Uint8Array(binary);
+  for (const comp of components){
+    if (comp.pixels.length < minPixels){
+      for (const idx of comp.pixels) out[idx] = 0;
+    }
+  }
+  return out;
+}
+
+// Morphological close (dilate then erode): smooths jagged threshold edges
+// so the thinning step below doesn't generate a spur for every little notch.
+function binaryClose(binary, cols, rows){
+  const get = (b,x,y) => (x<0||y<0||x>=cols||y>=rows) ? 0 : b[y*cols+x];
+  const dil = new Uint8Array(cols*rows);
+  for (let y=0;y<rows;y++) for (let x=0;x<cols;x++){
+    let v=0;
+    for (let dy=-1;dy<=1&&!v;dy++) for (let dx=-1;dx<=1&&!v;dx++) if (get(binary,x+dx,y+dy)) v=1;
+    dil[y*cols+x]=v;
+  }
+  const ero = new Uint8Array(cols*rows);
+  for (let y=0;y<rows;y++) for (let x=0;x<cols;x++){
+    let v=1;
+    for (let dy=-1;dy<=1&&v;dy++) for (let dx=-1;dx<=1&&v;dx++) if (!get(dil,x+dx,y+dy)) v=0;
+    ero[y*cols+x]=v;
+  }
+  return ero;
+}
+
+function zhangSuenThin(binary, cols, rows){
+  const img = Uint8Array.from(binary);
+  const get = (x,y) => (x<0||y<0||x>=cols||y>=rows) ? 0 : img[y*cols+x];
+  let changed = true;
+  while (changed){
+    changed = false;
+    for (let pass=0; pass<2; pass++){
+      const toRemove = [];
+      for (let y=0;y<rows;y++){
+        for (let x=0;x<cols;x++){
+          if (!get(x,y)) continue;
+          const p2=get(x,y-1),p3=get(x+1,y-1),p4=get(x+1,y),p5=get(x+1,y+1),
+                p6=get(x,y+1),p7=get(x-1,y+1),p8=get(x-1,y),p9=get(x-1,y-1);
+          const nb = [p2,p3,p4,p5,p6,p7,p8,p9];
+          const B = nb.reduce((a,b)=>a+b,0);
+          if (B<2 || B>6) continue;
+          let A = 0;
+          for (let i=0;i<8;i++) if (nb[i]===0 && nb[(i+1)%8]===1) A++;
+          if (A !== 1) continue;
+          if (pass===0){
+            if (p2*p4*p6 !== 0) continue;
+            if (p4*p6*p8 !== 0) continue;
+          } else {
+            if (p2*p4*p8 !== 0) continue;
+            if (p2*p6*p8 !== 0) continue;
+          }
+          toRemove.push(y*cols+x);
+        }
+      }
+      if (toRemove.length){ changed = true; for (const idx of toRemove) img[idx] = 0; }
+    }
+  }
+  return img;
+}
+
+// Removes short hair-like branches that dead-end into a junction (an
+// artifact of pixel-level edge noise) without touching genuinely short,
+// isolated marks like a dot on "i" (those end at another endpoint, not a
+// junction, so they're left alone). This is what keeps a traced line as one
+// long smooth stroke instead of shattering into lots of tiny fragments.
+function pruneSkeletonSpurs(skeleton, cols, rows, maxSpurLen){
+  const img = Uint8Array.from(skeleton);
+  const get = (x,y) => (x<0||y<0||x>=cols||y>=rows) ? 0 : img[y*cols+x];
+  const N8 = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+  const neighborsOf = (x,y) => { const out=[]; for (const [dx,dy] of N8) if (get(x+dx,y+dy)) out.push([x+dx,y+dy]); return out; };
+
+  let removedAny = true;
+  while (removedAny){
+    removedAny = false;
+    const endpoints = [];
+    for (let y=0;y<rows;y++) for (let x=0;x<cols;x++) if (get(x,y) && neighborsOf(x,y).length===1) endpoints.push([x,y]);
+
+    for (const ep of endpoints){
+      const chain = [ep];
+      let prev = null, cur = ep;
+      while (true){
+        const nbrs = neighborsOf(cur[0], cur[1]).filter(n => !(prev && n[0]===prev[0] && n[1]===prev[1]));
+        if (nbrs.length !== 1) break; // junction or another endpoint reached
+        const next = nbrs[0];
+        chain.push(next);
+        prev = cur; cur = next;
+        if (chain.length > maxSpurLen) break;
+      }
+      const last = chain[chain.length-1];
+      const lastDeg = neighborsOf(last[0], last[1]).length;
+      if (chain.length <= maxSpurLen && lastDeg >= 3){
+        for (let i=0;i<chain.length-1;i++){ const [x,y]=chain[i]; img[y*cols+x] = 0; }
+        removedAny = true;
+      }
+    }
+  }
+  return img;
+}
+
+// Walks the 1px skeleton and emits one polyline per stroke: open chains
+// start at endpoints/junctions and run to the next endpoint/junction; a pure
+// closed loop (a circle/"o" has no endpoints at all) is captured separately
+// and comes back exactly to its own start point.
+function traceSkeletonPaths(skeleton, cols, rows){
+  const get = (x,y) => (x<0||y<0||x>=cols||y>=rows) ? 0 : skeleton[y*cols+x];
+  const N8 = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+  const neighborsOf = (x,y) => { const out=[]; for (const [dx,dy] of N8) if (get(x+dx,y+dy)) out.push([x+dx,y+dy]); return out; };
+  const key = (p) => p[0]+','+p[1];
+  const edgeKey = (a,b) => { const k1=key(a),k2=key(b); return k1<k2 ? k1+'|'+k2 : k2+'|'+k1; };
+  const visitedEdges = new Set();
+  const paths = [];
+
+  const pixels = [];
+  for (let y=0;y<rows;y++) for (let x=0;x<cols;x++) if (skeleton[y*cols+x]) pixels.push([x,y]);
+
+  function walkChain(a, b){
+    const path = [a, b];
+    let prev = a, cur = b;
+    while (true){
+      const nbrs = neighborsOf(cur[0], cur[1]).filter(n => !(n[0]===prev[0] && n[1]===prev[1]));
+      if (nbrs.length !== 1) break; // stop at endpoint (0) or junction (>1)
+      const next = nbrs[0];
+      const ek = edgeKey(cur, next);
+      if (visitedEdges.has(ek)) break;
+      visitedEdges.add(ek);
+      path.push(next);
+      prev = cur; cur = next;
+    }
+    return path;
+  }
+
+  // pass 1: open chains, starting from endpoints (degree 1) and junctions (degree >=3)
+  for (const p of pixels){
+    const nbrs = neighborsOf(p[0], p[1]);
+    if (nbrs.length === 2) continue; // interior of a chain, handled by walkChain
+    for (const n of nbrs){
+      const ek = edgeKey(p, n);
+      if (visitedEdges.has(ek)) continue;
+      visitedEdges.add(ek);
+      paths.push(walkChain(p, n));
+    }
+  }
+
+  // pass 2: whatever's left is a pure closed loop (all degree-2 pixels, no endpoints)
+  for (const p of pixels){
+    const nbrs = neighborsOf(p[0], p[1]);
+    if (nbrs.length !== 2) continue;
+    for (const n of nbrs){
+      const ek = edgeKey(p, n);
+      if (visitedEdges.has(ek)) continue;
+      visitedEdges.add(ek);
+      const path = [p, n];
+      let prev = p, cur = n;
+      while (true){
+        if (cur[0]===p[0] && cur[1]===p[1]) break; // closed the loop
+        const nbrs2 = neighborsOf(cur[0], cur[1]).filter(nn => !(nn[0]===prev[0] && nn[1]===prev[1]));
+        const next = nbrs2.find(nn => !visitedEdges.has(edgeKey(cur, nn)));
+        if (!next) break;
+        visitedEdges.add(edgeKey(cur, next));
+        path.push(next);
+        prev = cur; cur = next;
+      }
+      if (path.length >= 3) paths.push(path);
+    }
+  }
+
+  return paths.filter(p => p.length >= 2);
+}
+
+// traceSkeletonPaths stops every atomic chain the instant it hits a
+// junction (a pixel with 3+ skeleton neighbors), because that's the only
+// safe place to split a graph into simple chains. But a junction in
+// handwriting is usually just a dot touching a stem, or two strokes
+// crossing — a human would draw straight through it, not lift the pen
+// there. This fuses chains back together wherever exactly two of them
+// meet at a shared endpoint, so the pen only lifts where the ink is
+// actually disconnected (a real gap between letters/strokes), not at
+// every incidental junction pixel.
+function mergeSkeletonChains(paths){
+  const chains = paths.map(p => p.slice());
+  const keyOf = (pt) => pt[0]+','+pt[1];
+  let mergedSomething = true;
+  while (mergedSomething){
+    mergedSomething = false;
+    const endpointMap = new Map();
+    for (let i=0;i<chains.length;i++){
+      const c = chains[i];
+      if (!c || c.length < 2) continue;
+      const s = c[0], e = c[c.length-1];
+      if (keyOf(s) === keyOf(e)) continue; // closed loop — leave it alone
+      for (const [pt, isStart] of [[s,true],[e,false]]){
+        const k = keyOf(pt);
+        if (!endpointMap.has(k)) endpointMap.set(k, []);
+        endpointMap.get(k).push({ i, isStart });
+      }
+    }
+    for (const entries of endpointMap.values()){
+      if (entries.length !== 2) continue; // only fuse clean two-way meetings
+      const [a, b] = entries;
+      if (a.i === b.i) continue;
+      let ca = chains[a.i], cb = chains[b.i];
+      if (a.isStart) ca = ca.slice().reverse();
+      if (!b.isStart) cb = cb.slice().reverse();
+      chains[a.i] = ca.concat(cb.slice(1));
+      chains[b.i] = null;
+      mergedSomething = true;
+      break; // endpoints shifted — rebuild the map before continuing
+    }
+    if (mergedSomething){
+      const compact = chains.filter(Boolean);
+      chains.length = 0;
+      chains.push(...compact);
+    }
+  }
+  return chains;
+}
+
+function perpendicularDistance(p, a, b){
+  const dx = b[0]-a[0], dy = b[1]-a[1];
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return Math.hypot(p[0]-a[0], p[1]-a[1]);
+  return Math.abs(dy*p[0] - dx*p[1] + b[0]*a[1] - b[1]*a[0]) / len;
+}
+
+function douglasPeucker(points, epsilon){
+  if (points.length < 3) return points;
+  let maxDist = 0, index = 0;
+  const end = points.length - 1;
+  for (let i=1;i<end;i++){
+    const d = perpendicularDistance(points[i], points[0], points[end]);
+    if (d > maxDist){ maxDist = d; index = i; }
+  }
+  if (maxDist > epsilon){
+    const left = douglasPeucker(points.slice(0, index+1), epsilon);
+    const right = douglasPeucker(points.slice(index), epsilon);
+    return left.slice(0, -1).concat(right);
+  }
+  return [points[0], points[end]];
+}
+
+function extractContours(binary, cols, rows, opts){
+  opts = Object.assign({
+    method: 'boundary',   // 'boundary' (classic, robust, continuous outline) | 'skeleton' (single centerline, experimental)
+    epsilon: 0.7,         // px, path-simplification tolerance — higher = fewer points/smoother, lower = more faithful
+    minNoisePx: 3,        // drop specks smaller than this many pixels
+    closeLoops: true,     // snap the end of a closed shape back to its exact start (no gap on circles etc.)
+    morphClose: true,     // skeleton method only: smooth jagged edges before thinning
+    spurPruneLen: 4        // skeleton method only: trim hair-like branches up to this many px (0 = off)
+  }, opts || {});
+
+  const cleaned = removeSmallComponents(binary, cols, rows, opts.minNoisePx);
+
+  if (opts.method === 'skeleton'){
+    const smoothed = opts.morphClose ? binaryClose(cleaned, cols, rows) : cleaned;
+    const skeleton0 = zhangSuenThin(smoothed, cols, rows);
+    const skeleton = opts.spurPruneLen > 0 ? pruneSkeletonSpurs(skeleton0, cols, rows, opts.spurPruneLen) : skeleton0;
+    const rawPaths = mergeSkeletonChains(traceSkeletonPaths(skeleton, cols, rows));
+    return rawPaths.map(p => douglasPeucker(p, opts.epsilon)).filter(p => p.length >= 2);
+  }
+
+  // classic Moore-neighbor boundary trace: walks the perimeter of every dark
+  // blob (and every enclosed white hole, e.g. the inside of an "o"/ring).
+  // Robust and always continuous — a stroke's ink has two edges, so a line
+  // traces as a thin closed loop around both edges rather than a single
+  // centerline; use "skeleton" mode below if a true single line is wanted.
+  const contours = [];
+  const maxSteps = cols*rows*4 + 100;
+
+  const { components: blackComps } = labelComponents(idx => cleaned[idx]===1, cols, rows);
+  const isFgBlack = (x,y) => x>=0&&y>=0&&x<cols&&y<rows && cleaned[y*cols+x]===1;
+  for (const comp of blackComps){
+    if (comp.pixels.length < opts.minNoisePx) continue;
+    const start = topLeftOf(comp.pixels, cols);
+    const raw = traceBoundary(isFgBlack, start%cols, (start/cols)|0, maxSteps);
+    if (raw.length >= 3){
+      let simp = douglasPeucker(raw, opts.epsilon);
+      if (opts.closeLoops) simp = closeLoop(simp);
+      contours.push(simp);
+    }
+  }
+
+  const { components: whiteComps } = labelComponents(idx => cleaned[idx]===0, cols, rows);
+  const isFgWhite = (x,y) => x>=0&&y>=0&&x<cols&&y<rows && cleaned[y*cols+x]===0;
+  for (const comp of whiteComps){
+    if (comp.touchesBorder || comp.pixels.length < opts.minNoisePx) continue;
+    const start = topLeftOf(comp.pixels, cols);
+    const raw = traceBoundary(isFgWhite, start%cols, (start/cols)|0, maxSteps);
+    if (raw.length >= 3){
+      let simp = douglasPeucker(raw, opts.epsilon);
+      if (opts.closeLoops) simp = closeLoop(simp);
+      contours.push(simp);
+    }
+  }
+
+  return contours;
+}
+
+// Outline tracing only ever draws the *edge* of a dark region — a fully
+// black circle comes out as a hollow ring because there's nothing else to
+// draw. This scans the same cleaned binary image row-by-row (boustrophedon,
+// like raster mode) and emits a short line for every run of dark pixels it
+// crosses, restricted to a chosen spacing in mm. Combined with the outline
+// contours, a solid shape now gets its edge traced *and* its interior
+// hatched, instead of coming out empty.
+function generateHatchFillPaths(cleaned, cols, rows, heightMm, spacingMm){
+  const rowStepPx = Math.max(1, Math.round((spacingMm / heightMm) * rows));
+  const paths = [];
+  let dir = 1;
+  for (let y=0; y<rows; y+=rowStepPx){
+    const runs = [];
+    let runStart = -1;
+    for (let x=0; x<cols; x++){
+      const on = cleaned[y*cols+x] === 1;
+      if (on && runStart === -1) runStart = x;
+      if (!on && runStart !== -1){ runs.push([runStart, x-1]); runStart = -1; }
+    }
+    if (runStart !== -1) runs.push([runStart, cols-1]);
+    if (dir < 0) runs.reverse();
+    for (const [a,b] of runs){
+      if (a === b) continue; // single-pixel run, not worth a stroke
+      const p0 = [a, y], p1 = [b, y];
+      paths.push(dir > 0 ? [p0,p1] : [p1,p0]);
+    }
+    dir *= -1;
+  }
+  return paths;
+}
+
+function drawContourPreview(contours, cols, rows, fillPaths){
+  const w = imgProcCanvas.width, h = imgProcCanvas.height;
+  imgProcCtx.clearRect(0,0,w,h);
+  imgProcCtx.fillStyle = '#0a0b14';
+  imgProcCtx.fillRect(0,0,w,h);
+  const cr = w/h, ir = cols/rows;
+  let dw, dh;
+  if (ir > cr){ dw = w; dh = w/ir; } else { dh = h; dw = h*ir; }
+  const ox = (w-dw)/2, oy = (h-dh)/2;
+  const sx = dw/cols, sy = dh/rows;
+  if (fillPaths && fillPaths.length){
+    imgProcCtx.strokeStyle = 'rgba(74,144,217,0.45)';
+    imgProcCtx.lineWidth = Math.max(1, devicePixelRatio*0.6);
+    for (const [p0,p1] of fillPaths){
+      imgProcCtx.beginPath();
+      imgProcCtx.moveTo(ox + p0[0]*sx, oy + p0[1]*sy);
+      imgProcCtx.lineTo(ox + p1[0]*sx, oy + p1[1]*sy);
+      imgProcCtx.stroke();
+    }
+  }
+  imgProcCtx.strokeStyle = '#4a90d9';
+  imgProcCtx.lineWidth = Math.max(1, devicePixelRatio*0.9);
+  imgProcCtx.lineJoin = 'round';
+  imgProcCtx.lineCap = 'round';
+  for (const path of contours){
+    if (path.length < 2) continue;
+    imgProcCtx.beginPath();
+    imgProcCtx.moveTo(ox + path[0][0]*sx, oy + path[0][1]*sy);
+    for (let i=1;i<path.length;i++) imgProcCtx.lineTo(ox + path[i][0]*sx, oy + path[i][1]*sy);
+    imgProcCtx.stroke();
+  }
+}
+
+function updateImgStatsOutline(cols, rows, contours, fillPaths){
+  const totalPts = contours.reduce((s,c)=>s+c.length, 0);
+  const fillChip = (fillPaths && fillPaths.length) ? `<span class="stat-chip">Fill lines: ${fillPaths.length}</span>` : '';
+  document.getElementById('imgStats').innerHTML =
+    `<span class="stat-chip">Grid: ${cols}×${rows}</span>` +
+    `<span class="stat-chip">Outline count: ${contours.length}</span>` +
+    `<span class="stat-chip">Path points: ${totalPts}</span>` + fillChip;
+}
+
+// Greedy nearest-neighbor re-sequencing of the paths: starting from the
+// origin, repeatedly jump to whichever remaining path's nearer end is
+// closest to the pen's current position (a path can be walked in either
+// direction — same ink either way). This is what makes "finish a connected
+// line, then go to the nearest unfinished line" the actual drawing order,
+// instead of the raw left-to-right/top-to-bottom order the shapes happened
+// to be found in — which is what was causing the pen to dart right, then
+// left, then right again on a busy image.
+function orderPathsForTravel(paths){
+  const remaining = paths.map(p => ({ path: p, used: false }));
+  const ordered = [];
+  let curX = 0, curY = 0;
+  for (let n = 0; n < remaining.length; n++){
+    let bestIdx = -1, bestDist = Infinity, bestReversed = false;
+    for (let i=0;i<remaining.length;i++){
+      if (remaining[i].used) continue;
+      const p = remaining[i].path;
+      const s = p[0], e = p[p.length-1];
+      const dStart = (s[0]-curX)*(s[0]-curX) + (s[1]-curY)*(s[1]-curY);
+      const dEnd = (e[0]-curX)*(e[0]-curX) + (e[1]-curY)*(e[1]-curY);
+      if (dStart < bestDist){ bestDist = dStart; bestIdx = i; bestReversed = false; }
+      if (dEnd < bestDist){ bestDist = dEnd; bestIdx = i; bestReversed = true; }
+    }
+    if (bestIdx === -1) break;
+    let chosen = remaining[bestIdx].path;
+    if (bestReversed) chosen = chosen.slice().reverse();
+    remaining[bestIdx].used = true;
+    ordered.push(chosen);
+    const last = chosen[chosen.length-1];
+    curX = last[0]; curY = last[1];
+  }
+  return ordered;
+}
+
+function generateContourGCode(contours, cols, rows, widthMm, heightMm, opts){
+  opts = opts || {};
+  const scaleX = widthMm/cols, scaleY = heightMm/rows;
+  const mirrorX = document.getElementById('mirrorX').checked;
+  const mo = getMotionSettings();
+  // skipReorder: the caller already put these paths in a deliberate order
+  // (e.g. right-to-left reading order for handwriting) — the generic
+  // nearest-neighbor travel optimizer would only scramble that back up.
+  const orderedContours = (!opts.skipReorder && mo.optimizeTravel) ? orderPathsForTravel(contours) : contours;
+  const lines = [];
+  if (mo.embedHeader){ lines.push('G90'); lines.push('G21'); }
+  const settleLine = mo.settleMs > 0 ? `G04 P${(mo.settleMs/1000).toFixed(3)}` : null;
+  let totalPoints = 0, totalLenMm = 0, totalTravelMm = 0;
+  const toMm = (p) => [ (mirrorX ? (cols - p[0]) : p[0])*scaleX, (rows - p[1])*scaleY ]; // flip Y (image-down -> plotter-up), optional flip X (mirror fix)
+  let penMm = [0,0];
+
+  for (const path of orderedContours){
+    if (path.length < 2) continue;
+    let [x0,y0] = toMm(path[0]);
+    totalTravelMm += Math.hypot(x0-penMm[0], y0-penMm[1]);
+    lines.push(`G00 X${x0.toFixed(3)} Y${y0.toFixed(3)}${mo.embedFeed ? ' F'+mo.rapidF : ''}`);
+    lines.push('M03');
+    if (settleLine) lines.push(settleLine);
+    let prevMm = [x0,y0];
+    for (let i=1;i<path.length;i++){
+      const [xm,ym] = toMm(path[i]);
+      lines.push(`G01 X${xm.toFixed(3)} Y${ym.toFixed(3)}${mo.embedFeed ? ' F'+mo.penF : ''}`);
+      totalLenMm += Math.hypot(xm-prevMm[0], ym-prevMm[1]);
+      prevMm = [xm,ym];
+    }
+    lines.push('M05');
+    if (settleLine) lines.push(settleLine);
+    totalPoints += path.length;
+    penMm = prevMm;
+  }
+  lines.push('HOME');
+  return { text: lines.join('\n'), stats: { contourCount: contours.length, totalPoints, totalLenMm: totalLenMm.toFixed(0), totalTravelMm: totalTravelMm.toFixed(0) } };
+}
+
+function updateImgStats(cols, rows, spacing, binary){
+  let dark = 0; for (const b of binary) dark += b;
+  const pct = ((dark/binary.length)*100).toFixed(1);
+  document.getElementById('imgStats').innerHTML =
+    `<span class="stat-chip">Grid: ${cols}×${rows}</span>` +
+    `<span class="stat-chip">Line spacing: ${spacing}mm</span>` +
+    `<span class="stat-chip">Black coverage: ${pct}%</span>`;
+}
+
+// ---- raster scan -> G-Code (boustrophedon: zigzag rows to cut travel) ----
+function generateRasterGCode(binary, cols, rows, spacing){
+  const mirrorX = document.getElementById('mirrorX').checked;
+  const mo = getMotionSettings();
+  const lines = [];
+  if (mo.embedHeader){ lines.push('G90'); lines.push('G21'); }
+  const settleLine = mo.settleMs > 0 ? `G04 P${(mo.settleMs/1000).toFixed(3)}` : null;
+  let penIsDown = false;
+  let segCount = 0, totalLenMm = 0;
+  let lastX = null, lastY = null;
+
+  for (let row = 0; row < rows; row++){
+    const yMm = (rows - row) * spacing; // flip so row 0 (top of image) is highest Y
+    const leftToRight = row % 2 === 0;
+    let x = leftToRight ? 0 : cols-1;
+    const step = leftToRight ? 1 : -1;
+    let runStart = null;
+
+    for (let n=0; n<cols; n++, x+=step){
+      const dark = !!binary[row*cols+x];
+      if (dark && runStart === null){ runStart = x; }
+      const isLastCol = n === cols-1;
+      const runEnds = (!dark || isLastCol) && runStart !== null;
+      if (runEnds){
+        const endX = (dark && isLastCol) ? x : x - step;
+        const rawStartMm = runStart * spacing;
+        const rawEndMm = endX * spacing;
+        const xStartMm = mirrorX ? (cols*spacing - rawStartMm) : rawStartMm;
+        const xEndMm = mirrorX ? (cols*spacing - rawEndMm) : rawEndMm;
+        if (!penIsDown || lastY !== yMm){
+          lines.push(`G00 X${xStartMm.toFixed(3)} Y${yMm.toFixed(3)}${mo.embedFeed ? ' F'+mo.rapidF : ''}`);
+          lines.push('M03'); penIsDown = true;
+          if (settleLine) lines.push(settleLine);
+        }
+        lines.push(`G01 X${xEndMm.toFixed(3)} Y${yMm.toFixed(3)}${mo.embedFeed ? ' F'+mo.penF : ''}`);
+        lines.push('M05'); penIsDown = false;
+        if (settleLine) lines.push(settleLine);
+        segCount++;
+        totalLenMm += Math.abs(xEndMm - xStartMm);
+        lastX = xEndMm; lastY = yMm;
+        runStart = null;
+      }
+    }
+  }
+  lines.push('HOME');
+  return { text: lines.join('\n'), stats: { segCount, totalLenMm: totalLenMm.toFixed(0) } };
+}
+
+document.getElementById('btnGenGcode').addEventListener('click', ()=>{
+  runImageGeneration(false);
+});
+document.getElementById('btnSendImgGcode').addEventListener('click', ()=>{
+  runImageGeneration(true);
+});
+
+function runImageGeneration(alsoSend){
+  if (!uploadedImage || !lastGrid){ showToast('Upload an image first', true); return; }
+  const { cols, rows, spacing, widthMm, heightMm, mode } = lastGrid;
+
+  let result;
+  if (mode === 'outline'){
+    if (!lastContours){ showToast('Preview it first', true); return; }
+    if (lastContours.length === 0){
+      showToast('No outlines found — try adjusting the threshold or contrast', true);
+      return;
+    }
+    const allPaths = (lastFillPaths && lastFillPaths.length) ? lastContours.concat(lastFillPaths) : lastContours;
+    result = generateContourGCode(allPaths, cols, rows, widthMm, heightMm);
+    const fillNote = (lastFillPaths && lastFillPaths.length) ? ` + ${lastFillPaths.length} fill lines` : '';
+    log('imgGenLog', `G-Code generated: ${result.stats.contourCount} outlines${fillNote}, ${result.stats.totalPoints} points, about ${result.stats.totalLenMm}mm drawing length + ${result.stats.totalTravelMm}mm travel`, 'ok');
+  } else {
+    if (!lastBinary){ showToast('Preview it first', true); return; }
+    result = generateRasterGCode(lastBinary, cols, rows, spacing);
+    log('imgGenLog', `G-Code generated: ${result.stats.segCount} drawing lines, about ${result.stats.totalLenMm}mm path length`, 'ok');
+  }
+
+  document.getElementById('gcodeText').value = result.text;
+
+  // reuse the G-Code tab's own preview pipeline
+  currentPath = parseGCodePath(result.text.split('\n'));
+  toolPos = {x:0,y:0};
+
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="gcode"]').classList.add('active');
+  document.getElementById('screen-gcode').classList.add('active');
+  setTimeout(()=>{
+    resizeCanvas();
+    const b = currentPath.bounds;
+    document.getElementById('bedInfo').textContent =
+      `Lines: ${currentPath.totalLines} · Range X[${b.minX.toFixed(1)}..${b.maxX.toFixed(1)}] Y[${b.minY.toFixed(1)}..${b.maxY.toFixed(1)}]`;
+  }, 30);
+
+  if (alsoSend) sendGcodeText(result.text, 'gcodeLog');
+}
+
+/* =========================================================
+   Handwriting text -> G-Code module
+   Pipeline: draw typed text into an offscreen canvas with a
+   handwriting-style font -> threshold to binary -> reuse the
+   same outline tracer as the image mode -> polyline G-Code,
+   previewed on the G-Code tab.
+========================================================= */
+let customHandFont = null;      // FontFace family name, once a font file is uploaded
+let lastTextRenderCanvas = null; // offscreen canvas holding the rendered text
+let lastTextGrid = null;         // {cols, rows, widthMm, heightMm}
+
+const txtPreviewCanvas = document.getElementById('txtPreviewCanvas');
+const txtPreviewCtx = txtPreviewCanvas.getContext('2d');
+
+function resizeTxtCanvas(){
+  const r = txtPreviewCanvas.getBoundingClientRect();
+  txtPreviewCanvas.width = Math.max(1, r.width * devicePixelRatio);
+  txtPreviewCanvas.height = Math.max(1, r.height * devicePixelRatio);
+}
+
+document.getElementById('btnHandFontUpload').addEventListener('click', ()=>{
+  document.getElementById('handFontFile').click();
+});
+
+document.getElementById('handFontFile').addEventListener('change', async (e)=>{
+  const f = e.target.files[0];
+  if (!f) return;
+  try{
+    const buf = await f.arrayBuffer();
+    const fontName = 'CustomHandFont';
+    const face = new FontFace(fontName, buf);
+    await face.load();
+    document.fonts.add(face);
+    customHandFont = fontName;
+    const sel = document.getElementById('handFontSelect');
+    let opt = sel.querySelector('option[value="__custom__"]');
+    if (!opt){
+      opt = document.createElement('option');
+      opt.value = '__custom__';
+      sel.appendChild(opt);
+    }
+    opt.textContent = `Custom font: ${f.name}`;
+    sel.value = '__custom__';
+    showToast('Font uploaded successfully', false);
+    renderTextPreview();
+  }catch(err){
+    showToast('Error loading font: ' + err.message, true);
+  }
+});
+
+const debouncedTextPreview = debounce(renderTextPreview, 200);
+['handText','handFontSizeMm','handWidthMm','handLineSpacing','handPxPerMm'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', debouncedTextPreview);
+});
+['handFontSelect','handRtl'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', renderTextPreview);
+});
+document.getElementById('handPxPerMm').addEventListener('input', (e)=>{
+  document.getElementById('handPxPerMmVal').textContent = parseFloat(e.target.value).toFixed(1)+' px/mm';
+});
+document.getElementById('handThreshold').addEventListener('input', (e)=>{
+  document.getElementById('handThreshVal').textContent = e.target.value;
+});
+function updateHandTraceOptsVisibility(){
+  const isSkeleton = document.getElementById('handTraceMethod').value === 'skeleton';
+  document.getElementById('handSkeletonOpts').style.display = isSkeleton ? '' : 'none';
+}
+document.getElementById('handTraceMethod').addEventListener('change', updateHandTraceOptsVisibility);
+updateHandTraceOptsVisibility();
+
+function currentHandTraceOpts(){
+  return {
+    method: document.getElementById('handTraceMethod').value,
+    epsilon: parseFloat(document.getElementById('handEpsilon').value) || 0.6,
+    minNoisePx: parseInt(document.getElementById('handMinNoise').value, 10) || 0,
+    closeLoops: document.getElementById('handCloseLoops').checked,
+    morphClose: document.getElementById('handMorphClose').checked,
+    spurPruneLen: parseInt(document.getElementById('handSpurPrune').value, 10) || 0
+  };
+}
+
+function currentHandFontFamily(){
+  const sel = document.getElementById('handFontSelect');
+  if (sel.value === '__custom__' && customHandFont) return customHandFont;
+  return sel.value;
+}
+
+async function renderTextPreview(){
+  const text = document.getElementById('handText').value || '';
+  const widthMm = parseFloat(document.getElementById('handWidthMm').value) || 150;
+  const fontMm = parseFloat(document.getElementById('handFontSizeMm').value) || 14;
+  const lineSpacingMult = parseFloat(document.getElementById('handLineSpacing').value) || 1.6;
+  const isRtl = document.getElementById('handRtl').checked;
+  const family = currentHandFontFamily();
+
+  const pxPerMm = parseFloat(document.getElementById('handPxPerMm').value) || 6; // working resolution for tracing
+  const cols = Math.max(20, Math.round(widthMm * pxPerMm));
+  const fontPx = Math.max(6, fontMm * pxPerMm);
+  const lineHeightPx = fontPx * lineSpacingMult;
+  const lines = text.split('\n');
+  const rows = Math.max(20, Math.round(lineHeightPx * lines.length + fontPx));
+
+  try{ await document.fonts.load(`${fontPx}px "${family}"`); }catch(e){ /* fall back to default */ }
+
+  const work = document.createElement('canvas');
+  work.width = cols; work.height = rows;
+  const wctx = work.getContext('2d');
+  wctx.fillStyle = '#ffffff';
+  wctx.fillRect(0,0,cols,rows);
+  wctx.fillStyle = '#000000';
+  wctx.font = `${fontPx}px "${family}"`;
+  wctx.textBaseline = 'alphabetic';
+  wctx.direction = isRtl ? 'rtl' : 'ltr';
+  wctx.textAlign = isRtl ? 'right' : 'left';
+  const startX = isRtl ? cols - fontPx*0.4 : fontPx*0.4;
+  lines.forEach((line, i)=>{
+    const y = fontPx*0.95 + i*lineHeightPx;
+    wctx.fillText(line, startX, y);
+  });
+
+  lastTextRenderCanvas = work;
+  lastTextGrid = { cols, rows, widthMm, heightMm: widthMm * rows / cols };
+
+  resizeTxtCanvas();
+  const w = txtPreviewCanvas.width, h = txtPreviewCanvas.height;
+  txtPreviewCtx.clearRect(0,0,w,h);
+  txtPreviewCtx.fillStyle = '#0a0b14';
+  txtPreviewCtx.fillRect(0,0,w,h);
+  const cr = w/h, ir = cols/rows;
+  let dw, dh;
+  if (ir > cr){ dw = w; dh = w/ir; } else { dh = h; dw = h*ir; }
+  const ox = (w-dw)/2, oy = (h-dh)/2;
+  txtPreviewCtx.fillStyle = '#ffffff';
+  txtPreviewCtx.fillRect(ox, oy, dw, dh);
+  txtPreviewCtx.drawImage(work, ox, oy, dw, dh);
+
+  document.getElementById('handStats').innerHTML =
+    `<span class="stat-chip">Grid: ${cols}×${rows}</span>` +
+    `<span class="stat-chip">Font: ${fontMm}mm</span>`;
+}
+
+document.getElementById('btnPreviewHand').addEventListener('click', renderTextPreview);
+document.getElementById('btnGenHandGcode').addEventListener('click', ()=>runHandwritingGeneration(false));
+document.getElementById('btnSendHandGcode').addEventListener('click', ()=>runHandwritingGeneration(true));
+
+// The tracer (labelComponents) discovers connected ink blobs in raster
+// scan order — top row first, left pixel first — which has nothing to do
+// with reading order. For RTL text that's actively backwards: the
+// left-most sub-word (the *last* one a person would write) gets traced
+// first. This reorders the already-traced contours the way a person
+// actually writes: cluster into text lines by vertical position, sort
+// lines top-to-bottom, and within each line sort sub-words right-to-left
+// (or left-to-right for LTR script) — so a connected group of joined
+// letters is drawn start-to-finish before the pen ever moves to the next group.
+function orderContoursForHandwriting(contours, rtl){
+  if (contours.length <= 1) return contours;
+  const withBounds = contours.map(c=>{
+    let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+    for (const [x,y] of c){
+      if (x<minX) minX=x; if (x>maxX) maxX=x;
+      if (y<minY) minY=y; if (y>maxY) maxY=y;
+    }
+    return { c, minX, maxX, minY, maxY, cy:(minY+maxY)/2, h:(maxY-minY) };
+  });
+  withBounds.sort((a,b)=>a.cy-b.cy);
+
+  // cluster into text lines: an item joins the current line if its
+  // vertical center is close to that line's running average center
+  const lines = [];
+  for (const item of withBounds){
+    const line = lines[lines.length-1];
+    if (line){
+      const avgCy = line.reduce((s,i)=>s+i.cy,0)/line.length;
+      const avgH = line.reduce((s,i)=>s+i.h,0)/line.length || 1;
+      if (Math.abs(item.cy - avgCy) < avgH*0.7){ line.push(item); continue; }
+    }
+    lines.push([item]);
+  }
+
+  const ordered = [];
+  for (const line of lines){
+    line.sort((a,b)=> rtl ? (b.maxX-a.maxX) : (a.minX-b.minX));
+    for (const item of line) ordered.push(item.c);
+  }
+  return ordered;
+}
+
+function runHandwritingGeneration(alsoSend){
+  if (!document.getElementById('handText').value.trim()){ showToast('Enter text first', true); return; }
+  if (!lastTextRenderCanvas || !lastTextGrid){ showToast('Preview it first', true); return; }
+
+  const { cols, rows, widthMm, heightMm } = lastTextGrid;
+  const wctx = lastTextRenderCanvas.getContext('2d');
+  const imgData = wctx.getImageData(0, 0, cols, rows);
+  const gray = toGrayscale(imgData, cols, rows, 0, 0);
+  const threshold = parseFloat(document.getElementById('handThreshold').value) || 128;
+  const binary = thresholdGray(gray, threshold); // dark pixels (the ink) = draw
+  const rawContours = extractContours(binary, cols, rows, currentHandTraceOpts()); // shared, user-configurable tracer
+
+  if (rawContours.length === 0){
+    showToast('No lines found to draw — check the text or font', true);
+    return;
+  }
+
+  const isRtl = document.getElementById('handRtl').checked;
+  const contours = orderContoursForHandwriting(rawContours, isRtl);
+
+  // skipReorder: keep our right-to-left reading order — don't let the
+  // generic nearest-neighbor travel optimizer re-shuffle it
+  const result = generateContourGCode(contours, cols, rows, widthMm, heightMm, { skipReorder: true });
+  log('handLog', `G-Code generated: ${result.stats.contourCount} line segments, ${result.stats.totalPoints} points, about ${result.stats.totalLenMm}mm drawing length + ${result.stats.totalTravelMm}mm travel`, 'ok');
+
+  document.getElementById('gcodeText').value = result.text;
+
+  // reuse the G-Code tab's own preview pipeline
+  currentPath = parseGCodePath(result.text.split('\n'));
+  toolPos = {x:0,y:0};
+
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="gcode"]').classList.add('active');
+  document.getElementById('screen-gcode').classList.add('active');
+  setTimeout(()=>{
+    resizeCanvas();
+    const b = currentPath.bounds;
+    document.getElementById('bedInfo').textContent =
+      `Lines: ${currentPath.totalLines} · Range X[${b.minX.toFixed(1)}..${b.maxX.toFixed(1)}] Y[${b.minY.toFixed(1)}..${b.maxY.toFixed(1)}]`;
+  }, 30);
+
+  if (alsoSend) sendGcodeText(result.text, 'gcodeLog');
+}
+
+// init
+loadPersisted();
+resizeCanvas();
+resizeImgCanvases();
+resizeTxtCanvas();
+
+/* =========================================================
+   PAINT TAB — freehand drawing → real-time G-Code → robot
+========================================================= */
+(function(){
+  const PLOTTER_MM = 90;      // max physical travel in mm
+
+  // ---- State ----
+  const strokes = [];          // completed strokes: [{pts:[{x,y}...], sent:bool}]
+  let   currentStroke = null;  // stroke being drawn right now
+  let   isDrawing = false;
+
+  // Robot send queue (array of G-Code line strings)
+  let   paintSendQueue  = [];
+  let   paintSending    = false;
+  let   paintAbort      = false;
+
+  // ---- DOM refs ----
+  const paintCanvas   = document.getElementById('paintCanvas');
+  const pCtx          = paintCanvas.getContext('2d');
+  const wrap          = document.getElementById('paintCanvasWrap');
+  const colorPicker   = document.getElementById('paintColor');
+  const sizePicker    = document.getElementById('paintSize');
+  const sizeVal       = document.getElementById('paintSizeVal');
+  const cursorPos     = document.getElementById('paintCursorPos');
+  const strokeCount   = document.getElementById('paintStrokeCount');
+  const queueStatus   = document.getElementById('paintQueueStatus');
+
+  sizePicker.addEventListener('input', () => sizeVal.textContent = sizePicker.value);
+
+  // ---- Resize canvas to match its CSS square size ----
+  function resizePaintCanvas(){
+    const r = paintCanvas.getBoundingClientRect();
+    const s = devicePixelRatio;
+    paintCanvas.width  = r.width  * s;
+    paintCanvas.height = r.height * s;
+    redrawAll();
+  }
+  new ResizeObserver(resizePaintCanvas).observe(wrap);
+
+  // ---- Coordinate helpers ----
+  // Convert a mouse/touch event to canvas pixel coords (accounting for DPR)
+  function evtToPx(e){
+    const r = paintCanvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return [
+      (touch.clientX - r.left) * (paintCanvas.width  / r.width),
+      (touch.clientY - r.top)  * (paintCanvas.height / r.height)
+    ];
+  }
+  // Convert canvas pixels to mm (0..PLOTTER_MM), Y is flipped (canvas top = plotter bottom)
+  function pxToMm(px, py){
+    const W = paintCanvas.width, H = paintCanvas.height;
+    return {
+      x: (px / W) * PLOTTER_MM,
+      y: PLOTTER_MM - (py / H) * PLOTTER_MM   // flip Y so top-left = (0,90)
+    };
+  }
+  // Convert mm to canvas pixels for redraw
+  function mmToPx(xmm, ymm){
+    const W = paintCanvas.width, H = paintCanvas.height;
+    return [
+      (xmm / PLOTTER_MM) * W,
+      (1 - ymm / PLOTTER_MM) * H
+    ];
+  }
+
+  // ---- Douglas-Peucker simplification (reduces G-Code lines) ----
+  function dpSimplify(pts, eps){
+    if (pts.length < 3) return pts;
+    let maxD = 0, idx = 0;
+    const end = pts.length - 1;
+    const [x1,y1] = [pts[0].x, pts[0].y];
+    const [x2,y2] = [pts[end].x, pts[end].y];
+    const len = Math.hypot(x2-x1, y2-y1);
+    for (let i=1;i<end;i++){
+      const d = len < 1e-9
+        ? Math.hypot(pts[i].x-x1, pts[i].y-y1)
+        : Math.abs((y2-y1)*pts[i].x - (x2-x1)*pts[i].y + x2*y1 - y2*x1) / len;
+      if (d > maxD){ maxD=d; idx=i; }
+    }
+    if (maxD > eps){
+      const l = dpSimplify(pts.slice(0,idx+1), eps);
+      const r = dpSimplify(pts.slice(idx), eps);
+      return [...l.slice(0,-1), ...r];
+    }
+    return [pts[0], pts[end]];
+  }
+
+  // ---- Redraw the whole canvas from scratch ----
+  function redrawAll(){
+    const W = paintCanvas.width, H = paintCanvas.height;
+    pCtx.clearRect(0,0,W,H);
+
+    // dark background
+    pCtx.fillStyle = '#07080f';
+    pCtx.fillRect(0,0,W,H);
+
+    // subtle 10mm grid
+    pCtx.strokeStyle = 'rgba(255,255,255,0.04)';
+    pCtx.lineWidth = 1;
+    for (let mm=0; mm<=PLOTTER_MM; mm+=10){
+      const [px] = mmToPx(mm, 0); const [,py] = mmToPx(0, mm);
+      pCtx.beginPath(); pCtx.moveTo(px,0); pCtx.lineTo(px,H); pCtx.stroke();
+      pCtx.beginPath(); pCtx.moveTo(0,py); pCtx.lineTo(W,py); pCtx.stroke();
+    }
+    // border highlight (90mm boundary = the full canvas)
+    pCtx.strokeStyle = 'rgba(74,144,217,0.18)';
+    pCtx.lineWidth = 2;
+    pCtx.strokeRect(1,1,W-2,H-2);
+
+    // draw completed strokes
+    for (const stroke of strokes){
+      drawStroke(stroke.pts, stroke.color, stroke.size, stroke.sent ? 0.5 : 1.0);
+    }
+    // draw in-progress stroke
+    if (currentStroke && currentStroke.pts.length > 1){
+      drawStroke(currentStroke.pts, currentStroke.color, currentStroke.size, 1.0);
+    }
+  }
+
+  function drawStroke(pts, color, size, alpha){
+    if (pts.length < 2) return;
+    pCtx.save();
+    pCtx.globalAlpha = alpha;
+    pCtx.strokeStyle = color;
+    pCtx.lineWidth   = size * devicePixelRatio;
+    pCtx.lineCap     = 'round';
+    pCtx.lineJoin    = 'round';
+    pCtx.beginPath();
+    const [sx,sy] = mmToPx(pts[0].x, pts[0].y);
+    pCtx.moveTo(sx,sy);
+    for (let i=1;i<pts.length;i++){
+      const [px,py] = mmToPx(pts[i].x, pts[i].y);
+      pCtx.lineTo(px,py);
+    }
+    pCtx.stroke();
+    pCtx.restore();
+  }
+
+  // ---- Stroke count readout ----
+  function updateStrokeCount(){
+    strokeCount.textContent = strokes.length + (currentStroke ? 1 : 0);
+  }
+
+  // ---- Mouse / Touch handlers ----
+  function onPointerDown(e){
+    if (e.button !== undefined && e.button !== 0) return; // left button only
+    e.preventDefault();
+    isDrawing = true;
+    const [px,py] = evtToPx(e);
+    const mm = pxToMm(px,py);
+    currentStroke = { pts:[mm], color: colorPicker.value, size: parseFloat(sizePicker.value), sent:false };
+    updateStrokeCount();
+
+    // Real-time: raise pen → rapid-travel to stroke start → lower pen
+    // This prevents the pen from dragging across the paper between strokes.
+    if (document.getElementById('paintRealtime').checked && WebSocketClient.isConnected()){
+      enqueueGcodeLine('M05');                                                     // 1. ensure pen is UP
+      enqueueGcodeLine(`G00 X${mm.x.toFixed(2)} Y${mm.y.toFixed(2)}`);            // 2. move to stroke start (pen UP)
+      enqueueGcodeLine('M03');                                                     // 3. lower pen at correct position
+    }
+  }
+
+  function onPointerMove(e){
+    e.preventDefault();
+    // Update cursor readout
+    const [px,py] = evtToPx(e);
+    const mm = pxToMm(px,py);
+    cursorPos.textContent = `X ${Math.max(0,Math.min(PLOTTER_MM,mm.x)).toFixed(1)}  Y ${Math.max(0,Math.min(PLOTTER_MM,mm.y)).toFixed(1)} mm`;
+
+    if (!isDrawing || !currentStroke) return;
+
+    // Clamp to canvas
+    const clamped = {
+      x: Math.max(0, Math.min(PLOTTER_MM, mm.x)),
+      y: Math.max(0, Math.min(PLOTTER_MM, mm.y))
+    };
+    currentStroke.pts.push(clamped);
+    redrawAll();
+
+    // Real-time: enqueue G01 move for the last segment
+    if (document.getElementById('paintRealtime').checked && WebSocketClient.isConnected()){
+      const xf = clamped.x.toFixed(2);
+      const yf = clamped.y.toFixed(2);
+      enqueueGcodeLine(`G01 X${xf} Y${yf}`);
+    }
+  }
+
+  function onPointerUp(e){
+    e.preventDefault();
+    if (!isDrawing || !currentStroke) return;
+    isDrawing = false;
+
+    // Real-time: raise pen
+    if (document.getElementById('paintRealtime').checked && WebSocketClient.isConnected()){
+      enqueueGcodeLine('M05');
+    }
+
+    // Simplify and save stroke
+    const simplified = dpSimplify(currentStroke.pts, 0.4); // 0.4mm tolerance
+    currentStroke.pts = simplified;
+    strokes.push(currentStroke);
+    currentStroke = null;
+    updateStrokeCount();
+    redrawAll();
+  }
+
+  // Register events for mouse
+  paintCanvas.addEventListener('mousedown',  onPointerDown);
+  paintCanvas.addEventListener('mousemove',  onPointerMove);
+  paintCanvas.addEventListener('mouseup',    onPointerUp);
+  paintCanvas.addEventListener('mouseleave', onPointerUp);
+  // Touch
+  paintCanvas.addEventListener('touchstart', e => onPointerDown(e), {passive:false});
+  paintCanvas.addEventListener('touchmove',  e => onPointerMove(e), {passive:false});
+  paintCanvas.addEventListener('touchend',   e => onPointerUp(e),   {passive:false});
+
+  // ---- G-Code send queue (uses existing AckWaiter for flow control) ----
+  function enqueueGcodeLine(line){
+    paintSendQueue.push(line);
+    if (!paintSending) drainQueue();
+  }
+
+  async function drainQueue(){
+    if (paintSending) return;
+    paintSending = true;
+    paintAbort   = false;
+    const ACK_TIMEOUT = 18000;
+    const minGap = getMotionSettings().minLineGapMs;
+
+    while (paintSendQueue.length > 0 && !paintAbort){
+      if (!WebSocketClient.isConnected()){
+        queueStatus.textContent = 'Disconnected';
+        queueStatus.style.color = 'var(--coral)';
+        break;
+      }
+      const line = paintSendQueue.shift();
+      queueStatus.textContent = `Sending: ${line.substring(0,20)}`;
+      queueStatus.style.color = 'var(--amber)';
+
+      AckWaiter.cancel();
+      const msg = makeCommand('gcode_line', { line });
+      const ackPromise = AckWaiter.wait(ACK_TIMEOUT, lastSentCmdId);
+      const sent = WebSocketClient.send(msg);
+      if (!sent) break;
+      await ackPromise;
+      if (minGap > 0) await sleep(minGap);
+    }
+
+    paintSending = false;
+    queueStatus.textContent = paintAbort ? 'Stopped' : 'Idle';
+    queueStatus.style.color = paintAbort ? 'var(--coral)' : 'var(--teal)';
+  }
+
+  // ---- Convert all strokes to G-Code lines ----
+  function strokesAsGcode(){
+    const lines = [];
+    for (const stroke of strokes){
+      if (stroke.pts.length < 2) continue;
+      lines.push('M05');
+      const first = stroke.pts[0];
+      lines.push(`G00 X${first.x.toFixed(2)} Y${first.y.toFixed(2)}`);
+      lines.push('M03');
+      for (let i=1;i<stroke.pts.length;i++){
+        const p = stroke.pts[i];
+        lines.push(`G01 X${p.x.toFixed(2)} Y${p.y.toFixed(2)}`);
+      }
+      lines.push('M05');
+    }
+    lines.push('HOME');
+    return lines.join('\n');
+  }
+
+  // ---- Buttons ----
+  document.getElementById('btnPaintUndo').addEventListener('click', () => {
+    if (strokes.length === 0){ showToast('Nothing to undo', true); return; }
+    strokes.pop();
+    updateStrokeCount();
+    redrawAll();
+  });
+
+  document.getElementById('btnPaintClear').addEventListener('click', () => {
+    strokes.length = 0;
+    currentStroke = null;
+    isDrawing = false;
+    paintSendQueue = [];
+    updateStrokeCount();
+    redrawAll();
+    log('paintLog', 'Canvas cleared');
+    if (WebSocketClient.isConnected()){
+      WebSocketClient.send(makeCommand('home', {}));
+      log('paintLog', 'Robot returning to home', 'ok');
+    }
+  });
+
+  document.getElementById('btnPaintSend').addEventListener('click', async () => {
+    if (!WebSocketClient.isConnected()){ showToast('Connect first', true); return; }
+    if (strokes.length === 0){ showToast('Nothing drawn yet', true); return; }
+
+    paintAbort = false;
+    // Mark all strokes as not-sent yet so we rebuild from scratch
+    strokes.forEach(s => s.sent = false);
+    redrawAll();
+
+    const gcode = strokesAsGcode();
+    log('paintLog', `Sending ${strokes.length} stroke(s) to robot...`);
+    showToast('Sending drawing to robot…', false);
+
+    await sendGcodeText(gcode, 'paintLog');
+
+    // Mark all as sent and dim them
+    strokes.forEach(s => s.sent = true);
+    redrawAll();
+    log('paintLog', 'Done ✔', 'ok');
+    showToast('Drawing sent!', false);
+  });
+
+  document.getElementById('btnPaintStop').addEventListener('click', () => {
+    paintAbort = true;
+    paintSendQueue = [];
+    gcodeSendAbort = true;
+    AckWaiter.cancel();
+    WebSocketClient.send(makeCommand('pause', {}));
+    log('paintLog', 'Stopped', 'err');
+    queueStatus.textContent = 'Stopped';
+    queueStatus.style.color = 'var(--coral)';
+  });
+
+  document.getElementById('btnPaintToGcode').addEventListener('click', () => {
+    if (strokes.length === 0){ showToast('Nothing drawn', true); return; }
+    const gcode = strokesAsGcode();
+    document.getElementById('gcodeText').value = gcode;
+    currentPath = parseGCodePath(gcode.split('\n'));
+    toolPos = {x:0,y:0};
+    // Switch to G-Code tab
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('.tab-btn[data-tab="gcode"]').classList.add('active');
+    document.getElementById('screen-gcode').classList.add('active');
+    setTimeout(() => {
+      resizeCanvas();
+      const b = currentPath.bounds;
+      document.getElementById('bedInfo').textContent =
+        `Lines: ${currentPath.totalLines} · Range X[${b.minX.toFixed(1)}..${b.maxX.toFixed(1)}] Y[${b.minY.toFixed(1)}..${b.maxY.toFixed(1)}]`;
+    }, 30);
+    log('paintLog', 'Exported to G-Code tab', 'ok');
+    showToast('G-Code ready in G-Code tab', false);
+  });
+
+  // ---- Tab switch hook: resize canvas when Paint tab is activated ----
+  // (patch into the existing tab listener without duplicating it)
+  const origTabHandler = document.querySelector('.tab-btn[data-tab="paint"]');
+  origTabHandler && origTabHandler.addEventListener('click', () => {
+    setTimeout(resizePaintCanvas, 30);
+  });
+
+  // Initial draw
+  resizePaintCanvas();
+})();
+// end Paint Tab
+</script>
+</body>
+</html>
