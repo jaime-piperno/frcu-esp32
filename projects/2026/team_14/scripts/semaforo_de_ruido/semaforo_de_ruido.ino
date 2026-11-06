@@ -2,31 +2,6 @@
   ============================================================
   MONITOR DE RUIDO - SEMAFORO RGB + BUZZER + LCD (ESP32 + KY-037)
   ============================================================
-
-  CONEXIONES (ESP32 DevKit V1)
-  ------------------------------------------------------------
-  Componente          Senal        Pin ESP32   Alimentacion
-  ------------------------------------------------------------
-  Microfono KY-037    A0           GPIO34      3V3  (nunca 5 V)
-                      D0           sin usar
-  LED RGB (catodo     R            GPIO26      catodo a GND
-  comun, 220 ohm)     G            GPIO25
-                      B            GPIO27
-  Buzzer              senal        GPIO23      3V3 o 5 V
-  Encoder rotativo    CLK          GPIO18      3V3
-                      DT           GPIO19
-                      SW           GPIO21
-  LCD 1602 I2C        SDA          GPIO32      VIN (5 V)
-                      SCL          GPIO33
-  ------------------------------------------------------------
-  GPIO34 es solo entrada y no tiene resistencias internas: sirve
-  para el microfono, no para salidas. El I2C no usa los GPIO21 y
-  GPIO22 por defecto porque el GPIO21 lo ocupa el boton del encoder.
-  El LCD trabaja a 5 V y sus resistencias pull-up dejan SDA y SCL en
-  5 V, por lo que corresponde intercalar un conversor de nivel a 3,3 V.
-
-  FUNCIONAMIENTO
-  ------------------------------------------------------------
   - Amplitud pico a pico en ventanas de 50 ms (cancela el DC).
   - Piso de silencio calibrado al arrancar y con el boton del encoder.
   - Umbrales = piso + margen - sensibilidad * 2, con histeresis.
@@ -37,20 +12,18 @@
       fila 0: nivel + amplitud, o aviso temporal (sensibilidad / calibracion)
       fila 1: barra de ruido con 80 segmentos y marcas de umbral
               (punteada = amarillo, llena = rojo)
-
-  REQUISITOS
-  ------------------------------------------------------------
-  Core ESP32 2.0.3+ o 3.x.
-  Libreria "LiquidCrystal I2C" (Frank de Brabander).
+  Version Telegram: requiere core ESP32 3.3.12 (verificacion HTTPS con CA integradas).
+  Libreria: "LiquidCrystal I2C" (Frank de Brabander).
   ============================================================
 */
 
 #include <Arduino.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include "TelegramAvisos.h"
 
-// ---------------- PINES (ver la tabla del encabezado) ----------------
-const uint8_t PIN_MIC     = 34;  // solo entrada, ADC1
+// ---------------- PINES ----------------
+const uint8_t PIN_MIC     = 34;  // KY-037 A0 (ADC1)
 const uint8_t PIN_LED_R   = 26;
 const uint8_t PIN_LED_G   = 25;
 const uint8_t PIN_LED_B   = 27;
@@ -58,21 +31,13 @@ const uint8_t PIN_BUZZER  = 23;
 const uint8_t PIN_ENC_CLK = 18;
 const uint8_t PIN_ENC_DT  = 19;
 const uint8_t PIN_ENC_SW  = 21;
-const uint8_t PIN_I2C_SDA = 32;
+const uint8_t PIN_I2C_SDA = 32;  // GPIO21 (SDA por defecto) lo usa el boton del encoder
 const uint8_t PIN_I2C_SCL = 33;
 
 // ---------------- MICROFONO ----------------
-// 50 ms abarcan varios ciclos de las frecuencias audibles mas graves, asi que la
-// amplitud pico a pico se mantiene estable de una ventana a la siguiente.
 const uint32_t SAMPLE_WINDOW_MS = 50;
-// ADC_11db: fondo de escala ~2,45 V. Es la atenuacion con la que quedo ajustado el
-// potenciometro del KY-037 y a la que corresponden los margenes de mas abajo. Con
-// ADC_0db (~950 mV) se gana resolucion, pero hay que rehacer la calibracion entera
-// y recalcular MARGEN_AMARILLO_BASE y MARGEN_ROJO_BASE.
-const adc_attenuation_t MIC_ATTEN = ADC_11db;
+const adc_attenuation_t MIC_ATTEN = ADC_0db;
 const uint16_t ADC_MAX = 4095;
-// Rango aceptable del offset de continua: fuera de el la senal se recorta contra
-// alguno de los extremos del ADC y la amplitud medida deja de ser confiable.
 const uint16_t DC_MIN  = 200;
 const uint16_t DC_MAX  = 3900;
 
@@ -91,19 +56,11 @@ const uint16_t MARGEN_SEGURIDAD_SILENCIO = 15;
 const uint32_t ESPERA_PRE_CALIBRACION_MS = 600;
 
 // ---------------- UMBRALES ----------------
-// Los umbrales son relativos al piso de silencio medido en la calibracion y no
-// valores absolutos, asi el semaforo se adapta al ambiente en cada encendido:
-//   umbral amarillo = piso + MARGEN_AMARILLO_BASE - sensibilidad * FACTOR_SENSIBILIDAD
-//   umbral rojo     = piso + MARGEN_ROJO_BASE     - sensibilidad * FACTOR_SENSIBILIDAD
-// Para reajustarlos: abrir el Monitor Serie a 115200 y anotar la Amplitud en
-// silencio, hablando normal, hablando fuerte y con musica fuerte; cada margen va
-// a mitad de camino entre las dos situaciones que se quieren separar.
-const int32_t MARGEN_AMARILLO_BASE = 35;  // amplitud sobre el piso que pasa a MODERADO
-const int32_t MARGEN_ROJO_BASE     = 95;  // amplitud sobre el piso que pasa a FUERTE
-// Cuanto hay que bajar respecto del umbral para retroceder de nivel. Evita que el
-// LED oscile entre dos colores cuando el ruido se queda justo en el limite.
-const int32_t HISTERESIS           = 12;
-// Cuanto corre cada detente del encoder a los dos umbrales (horario = mas sensible).
+// Calibrado con ADC_0db: piso 126 | habla normal 120 | habla fuerte 190
+// | musica fuerte 250 | aplausos/gritos 1700-3000
+const int32_t MARGEN_AMARILLO_BASE = 35;  // umbral ~161: entre habla normal y fuerte
+const int32_t MARGEN_ROJO_BASE     = 95;  // umbral ~221: entre habla fuerte y musica
+const int32_t HISTERESIS           = 12;  // salida de rojo ~209 (> habla fuerte)
 const int32_t FACTOR_SENSIBILIDAD  = 2;
 const int32_t SENS_RANGO = 10;
 // Tope superior: el punto donde el amarillo toca su limite (piso + H + 1).
@@ -304,10 +261,6 @@ bool puedeMedir() {
 // ============================================================
 // MEDICION
 // ============================================================
-// Una lectura suelta no dice nada del nivel de ruido: depende del instante de la
-// onda en que cayo el muestreo. Midiendo el maximo y el minimo durante 50 ms se
-// obtiene la amplitud pico a pico, proporcional al volumen y sin el offset de
-// continua del modulo, que se cancela en la resta.
 Ventana medirVentana() {
   Ventana v = {ADC_MAX, 0, 0, 0};
   uint32_t inicio = millis();
@@ -731,6 +684,7 @@ void setup() {
   analogSetPinAttenuation(PIN_MIC, MIC_ATTEN);
 
   iniciarLcd();
+  iniciarTelegram();
 
   calibrarSilencio();
   ultimoBoton = millis();
@@ -753,4 +707,6 @@ void loop() {
 
   refrescarLcd();  // entre ventanas: nunca hay trafico I2C durante el muestreo
   imprimirDebug();
+  manejarTelegram(nivelActual == FUERTE, ultimaAmplitud);
 }
+
