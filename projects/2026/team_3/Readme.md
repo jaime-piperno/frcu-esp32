@@ -291,3 +291,78 @@ The counter resets on any reading that contradicts the condition, so an isolated
 ### Potential improvements
 
 We propose implementing a dynamic filling feature in which the user can set the desired fill level by pressing one of four push buttons, to be added by the next team. Each button could represent a fixed value, for example 25%, 50%, 75% and 100%. Knowing the container's maximum capacity or total depth, the system would automatically calculate the equivalent level and fill the glass exactly up to that mark.
+
+---
+
+## 🔄 Stage 2 – Improvement
+
+- **Team number:** 4
+- **Members:**
+  - Delavalle Jeronimo
+  - Masalles Ignacio
+  - Irigaray Mateo
+  - Plata Santiago
+
+### 🚀 Improvement Description
+
+- **What was improved:** Fill-level selection from **10% to 100%, in steps of 10%**, using a **KY-040 rotary encoder** or a **local web page hosted by the ESP32**. Both interfaces share the same selection. The firmware now uses the measured rim and bottom to calculate the target and checks the water level with the pump off before confirming completion.
+- **Why:** Stage 1 always filled to its maximum safe level, while the measured bottom did not participate in the cut-off calculation. The improvement allows the user to request a lower level while keeping the original start button, measurement sequence and upper safety margin.
+
+The percentage refers to **water height between the bottom and the maximum safe level**. At **100%**, the target remains **1.5 cm below the rim**. For glasses with a variable cross-section, this is not equivalent to the same percentage of volume.
+
+
+### 🔩 Component Changes
+
+| **Change** | **Component** | **Quantity** | **Notes** |
+|---|---|---|---|
+| Added | KY-040 rotary encoder | 1 | CLK → GPIO 32, DT → GPIO 33, SW → GPIO 25, + → 3.3 V, GND → GND. |
+| Added | Jumper wires | 5 | Connect the encoder signals, power and ground to the ESP32. |
+
+The original sensor, pump, relay, start button and RGB LED connections are retained. The web interface uses the ESP32's built-in WiFi, so no additional communication module is required.
+
+![Stage 2 wiring diagram with KY-040 encoder](docs/diagrama_conexion_etapa2.png)
+
+### 🛠️ Updated Usage Instructions
+
+1. **Connect the encoder** according to the updated wiring diagram and the table above. Power it at **3.3 V**.
+2. **Upload the updated firmware** from [dispensador_automatico/dispensador_automatico.ino](dispensador_automatico/dispensador_automatico.ino), using **ESP32 Dev Module** in Arduino IDE. The libraries `WiFi.h` and `WebServer.h` are included with **esp32 by Espressif Systems**; no additional Arduino libraries are needed. Open the Serial Monitor at **115200 baud**.
+3. **Check the assembly calibration.** The current sensor-to-support distance is **17.4 cm**. Subtracting a **0.4 cm** detection margin sets the presence threshold at **less than 17 cm**. These values replace the Stage 1 calibration for the current setup and must be checked if the sensor or support is moved. The support distance does not substitute for the measured bottom of the glass.
+4. **Select the level locally.** Turning the encoder changes the percentage by 10; pressing its switch confirms the selection. The firmware starts at **100%** after each restart. Selecting or confirming a level alone does not start the pump.
+5. **Alternatively, select from the phone.** Connect to **Dispensador-ESP32**, password **AguaESP32**, and open **http://192.168.4.1**. Keep the WiFi connection even if the phone indicates that it has no Internet access. Choose a percentage and optionally press **Confirmar nivel**. The page queries the same value used by the encoder.
+6. **Follow the original start sequence** with a completely empty glass and a flat lid resting on its rim. Press and release the original start button, wait for the blue LED, and remove the lid and hand without moving the glass. The updated firmware takes **five samples** for each reference, requires a maximum spread of **0.5 cm**, and stores the median. An invalid or unstable reference prevents pumping.
+7. **Wait for level verification.** Three consecutive target readings turn the pump off. After **500 ms**, five stable measurements check the water at rest. If they confirm the target, the firmware completes the cycle, with a **0.3 cm verification tolerance**. If valid, coherent readings show that more water is needed, the same cycle can resume up to **three times**. An error keeps the pump off and requires a new start sequence.
+8. **Use the built-in sensor diagnostic** when checking alignment. Send **D** through the Serial Monitor: this cancels the current cycle, disables pumping and prints a distance every **300 ms**. Compare the readings without a glass, with an empty glass and with the lid. Send **X** to exit, release the start button and begin a new cycle. A separate calibration sketch is no longer necessary for these checks.
+
+The target calculation now uses both references:
+
+```cpp
+float distanciaMaximaSegura = distanciaBorde + MARGEN_SEGURIDAD;
+float alturaUtil = distanciaFondo - distanciaMaximaSegura;
+float distanciaObjetivo = distanciaFondo - alturaUtil * (porcentajeSeleccionado / 100.0f);
+```
+
+The Serial Monitor reports the selection, measured rim, bottom and calculated target. After successful verification, the final message is:
+
+```text
+Nivel seleccionado alcanzado y verificado. Bombeo finalizado.
+```
+
+### 🎥 Final Prototype Demonstration
+
+The following videos demonstrate the final operation of the Stage 2 prototype, showcasing both local and remote fill-level selection followed by automated dispensing and verification:
+
+- **[Local Selection via Rotary Encoder (50% Fill Level)](https://drive.google.com/file/d/15BEZWpAjTGNF0OnM9p1oQLEFqcq5scVS/view?usp=drive_link):** Shows the water level being selected locally using the KY-040 rotary encoder, after which the system automatically dispenses water and fills the glass up to the requested 50% height.
+- **[Remote Selection via Web Interface (20% Fill Level)](https://drive.google.com/file/d/1-xciS1IBRmJnq-t-WA8d-daTch49lDg0/view?usp=drive_link):** Shows the water level being selected remotely through the local web interface hosted by the ESP32, followed by the automated filling process stopping at the requested 20% height.
+
+### 🧪 Updated Simulation
+
+- **Wokwi project link:** Not available. No Wokwi project or export has been added in Stage 2; filling tests used the physical prototype.
+- **Diagram/export files:** [docs/diagrama_conexion_etapa2.png](docs/diagrama_conexion_etapa2.png) contains the updated wiring diagram, including the KY-040 encoder. It documents the physical connections and is not a Wokwi export.
+
+### 📝 Additional Notes
+
+- **Technical decisions:** The three main states were retained. Long waits and button release are handled without blocking the loop, using `millis()` timing where applicable, so the encoder and web server can continue to be serviced. Ultrasonic measurement still uses `pulseIn()` with a maximum wait of 30 ms.
+- **Error handling:** Three consecutive invalid readings during pumping switch the pump off. Emergency overfill detection takes priority over the normal target check, avoiding the two consecutive stop waits described in Stage 1. Emergency and invalid-reading stops do not resume pumping automatically.
+- **Sensor difficulties:** Tests showed unstable bottom references, premature stops and incorrect final levels. A stable echo can come from a wall, rim or another object instead of the intended surface. Filtering and verification cannot identify the reflecting object, so centring the glass and checking its actual dimensions remain necessary.
+- **Web difficulties:** Tests showed slow page loading and timeouts. The interface includes a **5-second request timeout** and retries. If it remains on “Conectando”, open **http://192.168.4.1/estado**, which should return JSON such as `{"porcentaje":100}`, and inspect the Serial Monitor. Reliable communication still needs sustained testing on the physical setup.
+- **Remaining limitations:** The selected percentage controls height rather than calibrated volume. Sampling latency, pump flow and residual water in the hose affect the final level. The firmware has no absolute maximum pumping time, and a sensor stuck at a plausible distance may not be detected.
