@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "author": "Grupo 12 - Traductor bidireccional + Telegram",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "boton",
+      "top": -40,
+      "left": 220,
+      "attrs": {
+        "color": "green",
+        "label": "Morse (Q)",
+        "key": "Q"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_pulldown",
+      "top": 45,
+      "left": 320,
+      "rotate": 90,
+      "attrs": {
+        "value": "10000"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led",
+      "top": 140,
+      "left": 240,
+      "attrs": {
+        "color": "red",
+        "label": "Senal Morse"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_led",
+      "top": 190,
+      "left": 160,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzzer",
+      "top": 265,
+      "left": 220,
+      "attrs": {
+        "volume": "0.1",
+        "mode": "smooth"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "boton_modo",
+      "top": -40,
+      "left": 450,
+      "attrs": {
+        "color": "blue",
+        "label": "MODO (M)",
+        "key": "M"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_modo",
+      "top": 140,
+      "left": 480,
+      "attrs": {
+        "color": "blue",
+        "label": "AZUL: Texto a Morse"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_modo",
+      "top": 190,
+      "left": 400,
+      "attrs": {
+        "value": "220"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "esp:TX0",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX0",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "esp:3V3",
+      "boton:1.l",
+      "red",
+      []
+    ],
+    [
+      "boton:2.l",
+      "esp:D4",
+      "green",
+      []
+    ],
+    [
+      "boton:2.r",
+      "r_pulldown:1",
+      "green",
+      []
+    ],
+    [
+      "r_pulldown:2",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "esp:D2",
+      "r_led:1",
+      "green",
+      []
+    ],
+    [
+      "r_led:2",
+      "led:A",
+      "green",
+      []
+    ],
+    [
+      "led:C",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "esp:D18",
+      "buzzer:2",
+      "blue",
+      []
+    ],
+    [
+      "buzzer:1",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "esp:D25",
+      "boton_modo:1.l",
+      "purple",
+      []
+    ],
+    [
+      "boton_modo:2.r",
+      "esp:GND.2",
+      "blue",
+      []
+    ],
+    [
+      "esp:D26",
+      "r_modo:1",
+      "blue",
+      []
+    ],
+    [
+      "r_modo:2",
+      "led_modo:A",
+      "blue",
+      []
+    ],
+    [
+      "led_modo:C",
+      "esp:GND.2",
+      "black",
+      []
+    ]
+  ],
+  "serialMonitor": {
+    "display": "always",
+    "newline": "lf",
+    "convertEol": false,
+    "collapse": false
+  },
+  "dependencies": {}
+}

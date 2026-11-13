@@ -1,0 +1,9 @@
+Secretos.h
+configuracion-privada.json
+build/
+salidas/
+*.bin
+*.elf
+*.map
+*.exe
+*.obj
