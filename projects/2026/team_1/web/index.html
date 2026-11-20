@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Confort Ambiental Multi-Nodo — Monitoreo Comparativo Interior vs. Exterior</title>
+<link rel="stylesheet" href="uplot.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="rotulo">
+  <div class="marca">
+    <div>
+      <h1 class="nombre">Confort Ambiental Multi-Nodo</h1>
+      <p class="subtitulo">Monitoreo Comparativo de Ambientes (Interior vs. Exterior)</p>
+    </div>
+  </div>
+  <div class="nodos-estado">
+    <div class="badge-nodo online" id="estado-aula" title="Nodo Interior (BME680 + LDR + KY-037)">
+      <span class="dot"></span>
+      <span>Interior: <strong id="aula-ip">Conectando…</strong></span>
+      <small id="aula-acc" style="color:var(--tinta-2)"></small>
+    </div>
+    <div class="badge-nodo offline" id="estado-pasillo" title="Nodo Exterior (DHT11 + MQ-135 + LDR + KY-037)">
+      <span class="dot"></span>
+      <span>Exterior: <strong id="pasillo-estado">Esperando datos…</strong></span>
+    </div>
+  </div>
+</header>
+
+<p class="aviso-conexion" id="aviso-conexion" role="status" hidden>
+  Sin conexión con el nodo central. Reintentando reconectar…
+</p>
+
+<p class="info-calibracion" id="info-calibracion"></p>
+
+<main>
+  <!-- 1. RESUMEN DE LAS 5 VARIABLES DE CONFORT -->
+  <section class="seccion-comparativa">
+    <h2>Las 5 Variables de Confort Ambiental (Tiempo Real)</h2>
+    <div class="comparativa-grid">
+      <!-- 1. IAQ -->
+      <div class="card-comp">
+        <div class="titulo">
+          <span>1. Calidad de Aire (IAQ)</span>
+          <span class="badge-estado" id="estado-comp-iaq">Confort</span>
+        </div>
+        <div class="valores">
+          <div class="nodo-col aula">
+            <div class="etiqueta">Interior</div>
+            <div class="num" id="val-aula-iaq">—</div>
+            <div class="unidad">IAQ (0–500)</div>
+          </div>
+          <div class="nodo-col pasillo">
+            <div class="etiqueta">Exterior</div>
+            <div class="num" id="val-pasillo-iaq">—</div>
+            <div class="unidad">IAQ (0–500)</div>
+          </div>
+        </div>
+        <div class="delta-pie">
+          <span>Diferencia (Interior - Exterior):</span>
+          <strong id="delta-iaq">—</strong>
+        </div>
+      </div>
+
+      <!-- 2. TEMPERATURA -->
+      <div class="card-comp">
+        <div class="titulo">
+          <span>2. Confort Térmico</span>
+          <span class="badge-estado" id="estado-comp-temp">Confort</span>
+        </div>
+        <div class="valores">
+          <div class="nodo-col aula">
+            <div class="etiqueta">Interior</div>
+            <div class="num" id="val-aula-temp">—</div>
+            <div class="unidad">°C</div>
+          </div>
+          <div class="nodo-col pasillo">
+            <div class="etiqueta">Exterior</div>
+            <div class="num" id="val-pasillo-temp">—</div>
+            <div class="unidad">°C</div>
+          </div>
+        </div>
+        <div class="delta-pie">
+          <span>Gradiente Térmico:</span>
+          <strong id="delta-temp">—</strong>
+        </div>
+      </div>
+
+      <!-- 3. HUMEDAD -->
+      <div class="card-comp">
+        <div class="titulo">
+          <span>3. Confort Higrométrico</span>
+          <span class="badge-estado" id="estado-comp-hum">Adecuado</span>
+        </div>
+        <div class="valores">
+          <div class="nodo-col aula">
+            <div class="etiqueta">Interior</div>
+            <div class="num" id="val-aula-hum">—</div>
+            <div class="unidad">% HR</div>
+          </div>
+          <div class="nodo-col pasillo">
+            <div class="etiqueta">Exterior</div>
+            <div class="num" id="val-pasillo-hum">—</div>
+            <div class="unidad">% HR</div>
+          </div>
+        </div>
+        <div class="delta-pie">
+          <span>Diferencia de Humedad:</span>
+          <strong id="delta-hum">—</strong>
+        </div>
+      </div>
+
+      <!-- 4. LUZ (LDR) -->
+      <div class="card-comp">
+        <div class="titulo">
+          <span>4. Confort Lumínico (LDR)</span>
+          <span class="badge-estado" id="estado-comp-ldr">Óptimo</span>
+        </div>
+        <div class="valores">
+          <div class="nodo-col aula">
+            <div class="etiqueta">Interior</div>
+            <div class="num" id="val-aula-ldr">—</div>
+            <div class="unidad">% Luz</div>
+          </div>
+          <div class="nodo-col pasillo">
+            <div class="etiqueta">Exterior</div>
+            <div class="num" id="val-pasillo-ldr">—</div>
+            <div class="unidad">% Luz</div>
+          </div>
+        </div>
+        <div class="delta-pie">
+          <span>Diferencia Lumínica:</span>
+          <strong id="delta-ldr">—</strong>
+        </div>
+      </div>
+
+      <!-- 5. RUIDO (KY-037) -->
+      <div class="card-comp">
+        <div class="titulo">
+          <span>5. Confort Acústico (KY-037)</span>
+          <span class="badge-estado" id="estado-comp-sonido">Silencioso</span>
+        </div>
+        <div class="valores">
+          <div class="nodo-col aula">
+            <div class="etiqueta">Interior</div>
+            <div class="num" id="val-aula-sonido">—</div>
+            <div class="unidad">% Actividad</div>
+          </div>
+          <div class="nodo-col pasillo">
+            <div class="etiqueta">Exterior</div>
+            <div class="num" id="val-pasillo-sonido">—</div>
+            <div class="unidad">% Actividad</div>
+          </div>
+        </div>
+        <div class="delta-pie">
+          <span>Diferencia Acústica:</span>
+          <strong id="delta-sonido">—</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. SECCIÓN DE LAS 5 GRÁFICAS COMPARATIVAS -->
+  <section class="graficas-seccion">
+    <div class="barra-controles">
+      <label class="toggle-crudo" title="Muestra las lecturas del Exterior sin la corrección de calibración">
+        <input type="checkbox" id="ver-crudo">
+        Ver sin calibrar
+      </label>
+      <div class="leyenda-graficas">
+        <span><span class="muestra-traza aula"></span> Nodo Interior</span>
+        <span><span class="muestra-traza pasillo"></span> Nodo Exterior</span>
+      </div>
+      <div class="segmentado" role="group" aria-label="Rango temporal">
+        <button type="button" data-rango="live" aria-pressed="true">15 min (vivo)</button>
+        <button type="button" data-rango="1h" aria-pressed="false">1 h</button>
+        <button type="button" data-rango="6h" aria-pressed="false">6 h</button>
+        <button type="button" data-rango="24h" aria-pressed="false">24 h</button>
+      </div>
+    </div>
+
+    <!-- Pestañas para seleccionar qué gráfica ver o ver todas -->
+    <div class="selector-tabs" role="tablist">
+      <button type="button" class="tab-btn" data-tab="todas" aria-pressed="true">📊 Las 5 Gráficas</button>
+      <button type="button" class="tab-btn" data-tab="iaq" aria-pressed="false">1. Calidad de Aire (IAQ)</button>
+      <button type="button" class="tab-btn" data-tab="temp" aria-pressed="false">2. Temperatura (°C)</button>
+      <button type="button" class="tab-btn" data-tab="hum" aria-pressed="false">3. Humedad (%)</button>
+      <button type="button" class="tab-btn" data-tab="ldr" aria-pressed="false">4. Iluminación (LDR %)</button>
+      <button type="button" class="tab-btn" data-tab="sonido" aria-pressed="false">5. Ruido (KY-037 %)</button>
+    </div>
+
+    <div id="contenedor-graficos">
+      <!-- Gráfico 1: IAQ -->
+      <div class="grafico-wrap" id="wrap-iaq">
+        <div class="grafico-titulo">1. Calidad de Aire (IAQ 0–500) — Interior vs. Exterior</div>
+        <div class="grafico" id="grafico-iaq"></div>
+      </div>
+
+      <!-- Gráfico 2: Temperatura -->
+      <div class="grafico-wrap" id="wrap-temp">
+        <div class="grafico-titulo">2. Confort Térmico: Temperatura (°C) — Interior vs. Exterior</div>
+        <div class="grafico" id="grafico-temp"></div>
+      </div>
+
+      <!-- Gráfico 3: Humedad -->
+      <div class="grafico-wrap" id="wrap-hum">
+        <div class="grafico-titulo">3. Confort Higrométrico: Humedad Relativa (% HR) — Interior vs. Exterior</div>
+        <div class="grafico" id="grafico-hum"></div>
+      </div>
+
+      <!-- Gráfico 4: Iluminación LDR -->
+      <div class="grafico-wrap" id="wrap-ldr">
+        <div class="grafico-titulo">4. Confort Lumínico: Iluminación LDR (% ADC1) — Interior vs. Exterior</div>
+        <div class="grafico" id="grafico-ldr"></div>
+      </div>
+
+      <!-- Gráfico 5: Ruido KY-037 -->
+      <div class="grafico-wrap" id="wrap-sonido">
+        <div class="grafico-titulo">5. Confort Acústico: Nivel de Ruido Digital KY-037 (%) — Interior vs. Exterior</div>
+        <div class="grafico" id="grafico-sonido"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. DIAGNÓSTICO DE EQUIPOS -->
+  <section class="equipo-seccion">
+    <h2>Estado del Sistema de Monitoreo</h2>
+    <dl id="equipo">
+      <div><dt>Nodo Servidor</dt><dd data-k="rol">Interior</dd></div>
+      <div><dt>Modo Wi-Fi</dt><dd data-k="modo">—</dd></div>
+      <div><dt>Dirección IP</dt><dd data-k="ip">—</dd></div>
+      <div><dt>Señal RSSI</dt><dd data-k="rssi">—</dd></div>
+      <div><dt>Tiempo encendido</dt><dd data-k="uptime">—</dd></div>
+      <div><dt>Memoria libre (Heap)</dt><dd data-k="heap">—</dd></div>
+    </dl>
+  </section>
+</main>
+
+<footer class="pie">
+  <a class="boton" href="/api/export.csv" download="confort_interior_exterior.csv">Exportar Dataset CSV (24 h)</a>
+  <button type="button" class="boton" id="tema">Tema: automático</button>
+</footer>
+
+<script src="uplot.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

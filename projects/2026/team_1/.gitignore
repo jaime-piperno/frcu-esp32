@@ -1,0 +1,7 @@
+firmware/**/secrets.h
+build/
+__pycache__/
+.DS_Store
+.superpowers/
+.playwright-mcp/
+.impeccable/review/
