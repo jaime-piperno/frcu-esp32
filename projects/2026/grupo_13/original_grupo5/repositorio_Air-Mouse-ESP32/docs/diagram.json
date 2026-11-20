@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 96, "left": 14.44, "attrs": {} },
+    {
+      "type": "wokwi-analog-joystick",
+      "id": "joystick1",
+      "top": -48.6,
+      "left": -100.2,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": -32.2,
+      "left": 134.4,
+      "attrs": { "color": "green", "xray": "1" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn2",
+      "top": 35,
+      "left": 134.4,
+      "attrs": { "color": "green", "xray": "1" }
+    },
+    { "type": "wokwi-ky-040", "id": "encoder1", "top": 241.7, "left": -173.6, "attrs": {} },
+    { "type": "wokwi-rgb-led", "id": "rgb1", "top": -34.4, "left": 231.5, "attrs": {} },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": 232.8,
+      "left": 136.2,
+      "attrs": { "volume": "0.1" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "joystick1:HORZ", "esp:32", "green", [ "v0" ] ],
+    [ "joystick1:VERT", "esp:33", "green", [ "v0" ] ],
+    [ "joystick1:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "joystick1:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "btn2:1.l", "esp:25", "green", [ "h0" ] ],
+    [ "btn2:2.r", "esp:GND.2", "green", [ "h0" ] ],
+    [ "btn1:1.l", "esp:26", "green", [ "h0" ] ],
+    [ "btn1:2.r", "esp:GND.2", "green", [ "h0" ] ],
+    [ "encoder1:CLK", "esp:18", "green", [ "h0" ] ],
+    [ "encoder1:DT", "esp:19", "green", [ "h0" ] ],
+    [ "encoder1:GND", "esp:GND.1", "black", [ "h0" ] ],
+    [ "encoder1:VCC", "esp:3V3", "red", [ "h76.8", "v-153.2" ] ],
+    [ "rgb1:R", "esp:13", "green", [ "v0" ] ],
+    [ "rgb1:B", "esp:27", "green", [ "v0" ] ],
+    [ "rgb1:G", "esp:14", "green", [ "v0" ] ],
+    [ "rgb1:COM", "esp:GND.3", "green", [ "v0" ] ],
+    [ "bz1:2", "esp:12", "green", [ "v-86.4", "h-154" ] ],
+    [ "bz1:1", "esp:GND.2", "green", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
