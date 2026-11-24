@@ -1,0 +1,5 @@
+# Librerías para el firmware de integración MQTT (plan v2).
+# Wokwi instala las librerías listadas acá automáticamente.
+PubSubClient
+ArduinoJson
+LiquidCrystal I2C

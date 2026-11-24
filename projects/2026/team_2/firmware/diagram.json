@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "author": "RecuerdaMed",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-lcd1602", "id": "lcd1", "top": -160, "left": -40, "attrs": { "pins": "i2c" } },
+    { "type": "wokwi-led", "id": "led1", "top": 60, "left": -70, "attrs": { "color": "red", "label": "Rojo (Alerta)" } },
+    { "type": "wokwi-led", "id": "led2", "top": 100, "left": -70, "attrs": { "color": "green", "label": "Verde (IDLE)" } },
+    { "type": "wokwi-led", "id": "led3", "top": 140, "left": -70, "attrs": { "color": "blue", "label": "Azul (Snooze)" } },
+    { "type": "wokwi-buzzer", "id": "buz1", "top": 190, "left": -70, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btn1", "top": 60, "left": 180, "attrs": { "color": "green", "label": "Confirmar" } },
+    { "type": "wokwi-pushbutton", "id": "btn2", "top": 120, "left": 180, "attrs": { "color": "blue", "label": "Snooze" } },
+    { "type": "wokwi-photoresistor-sensor", "id": "ldr1", "top": 180, "left": 180, "attrs": {} }
+  ],
+  "connections": [
+    [ "lcd1:GND", "esp:GND.1", "black", [ "h-20", "v100" ] ],
+    [ "lcd1:VCC", "esp:5V", "red", [ "h-10", "v90" ] ],
+    [ "lcd1:SDA", "esp:4", "blue", [ "h-30", "v120" ] ],
+    [ "lcd1:SCL", "esp:22", "yellow", [ "h-40", "v140" ] ],
+    [ "esp:19", "led1:A", "red", [] ],
+    [ "esp:GND.1", "led1:C", "black", [ "v-" ] ],
+    [ "esp:18", "led2:A", "green", [] ],
+    [ "esp:GND.1", "led2:C", "black", [ "v-" ] ],
+    [ "esp:23", "led3:A", "blue", [] ],
+    [ "esp:GND.1", "led3:C", "black", [ "v-" ] ],
+    [ "esp:GND.1", "buz1:1", "black", [ "v-" ] ],
+    [ "esp:21", "buz1:2", "orange", [] ],
+    [ "esp:5", "btn1:1.r", "green", [] ],
+    [ "esp:GND.1", "btn1:2.r", "black", [ "v-" ] ],
+    [ "esp:16", "btn2:1.r", "blue", [] ],
+    [ "esp:GND.1", "btn2:2.r", "black", [ "v-" ] ],
+    [ "esp:3V3", "ldr1:VCC", "red", [] ],
+    [ "esp:34", "ldr1:AO", "orange", [] ],
+    [ "esp:GND.1", "ldr1:GND", "black", [ "v-" ] ]
+  ],
+  "wifi": { "ssid": "Wokwi-GUEST", "password": "" },
+  "dependencies": {
+    "PubSubClient": "2.8.0",
+    "ArduinoJson": "7.4.3",
+    "LiquidCrystal I2C": "1.1.2"
+  }
+}

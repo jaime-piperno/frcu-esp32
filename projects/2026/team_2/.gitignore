@@ -1,0 +1,6 @@
+frontend/dist/
+frontend/node_modules/
+firmware/RecuerdaMed/build/
+firmware/RecuerdaMed/LocalConfig.h
+backend/**/bin/
+backend/**/obj/
